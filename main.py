@@ -10,10 +10,12 @@ load_dotenv()
 token = environ["TEST_TOKEN"]
 
 # set up logging
-logging_handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w")
+logging_handler = logging.FileHandler(
+    filename="discord.log", encoding="utf-8", mode="w")
 
 # test guild (so we can easily sync and test commands)
 TEST_GUILD = discord.Object(environ["TEST_GUILD_ID"])
+
 
 class BTBot(commands.Bot):
     def __init__(self, command_prefix: str) -> None:
@@ -22,17 +24,17 @@ class BTBot(commands.Bot):
         intents.message_content = True
         super().__init__(
             intents=intents,
-            command_prefix = command_prefix,
-            description = "Battle Talent Bot",
-            activity = discord.Game(
-                name="Battle Talent, of course ;D"))
-    
+            command_prefix=command_prefix,
+            description="Battle Talent Bot",
+            activity=discord.Game(
+                name="Battle Talent"))
+
     async def on_ready(self) -> None:
         # When we're all loaded in and ready, send this to give a clear indication in the console
         # mostly for when logging things
         print(f'logged in as {self.user} (ID: {self.user.id})')
         print("-----------------")
-    
+
     async def setup_hook(self) -> None:
         # any data processing to get stuff into memory goes here
 
@@ -49,7 +51,6 @@ class BTBot(commands.Bot):
                 # thus the traceback
                 print(f'Failed to load extension {cog}!')
                 traceback.print_exc()
-        
 
         # * If we are debugging, sync slash commands with discord here
         # await self.tree.sync()
@@ -57,8 +58,7 @@ class BTBot(commands.Bot):
         # await self.tree.sync(guild=TEST_GUILD)
 
 
-
 # ------------------------------MAIN CODE------------------------------
 bot = BTBot(command_prefix="!")
 if __name__ == "__main__":
-    bot.run(token , log_handler=logging_handler) # Run our bot!
+    bot.run(token, log_handler=logging_handler)  # Run our bot!
