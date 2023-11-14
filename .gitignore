@@ -1,0 +1,20 @@
+# Compiled binaries
+**/__pycache__
+
+# Environments
+venv/
+activate/
+scripts/
+bin/
+lib/
+pyvenv.cfg
+share/
+.env
+*.swp
+*~
+
+# Production databases
+*.sqlite
+
+# Other
+discord.log
