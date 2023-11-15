@@ -31,6 +31,13 @@ class Mod_manager(commands.Cog):
             self.moderators[msg.author.id][0] += 1
 
     @commands.Cog.listener()
+    async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
+        # skip if the message isn't sent by a moderator
+        # TODO; check what channel the message is sent in
+        if before.author.id in self.moderators:
+            self.moderators[before.author.id][1] += 1
+
+    @commands.Cog.listener()
     async def on_audit_log_entry_create(self, entry: discord.AuditLogEntry):
         # make sure the audit log entry is a message deletion, and that it is done by a moderator
         # TODO check what channel the message was deleted from
