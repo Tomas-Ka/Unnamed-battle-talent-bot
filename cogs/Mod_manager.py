@@ -5,11 +5,33 @@ import discord
 # TODO; WRITE DOCUMENTATION
 # I'm just too tired rn :P
 
+mod_category_id = 0
+
+
+class ConfigView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__()
+        self.mod_category_id = 0
+        self.mod_category_name = "Null"
+    
+    @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.category], placeholder="Select moderator category")
+    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
+        self.mod_category_id = select.values[0].id
+        self.mod_category_name = select.values[0].name
+        await interaction.response.defer()
+
+    @discord.ui.button(style=discord.ButtonStyle.success, label="Confirm")
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        mod_category_id = self.mod_category_id
+        print(mod_category_id)
+        self.confirm.disabled = True
+        self.channel_select.disabled = True
+        await interaction.response.edit_message(content=f"mod category is: {self.mod_category_name}", view=self)
+        self.stop()
+
 
 class Mod_manager(commands.Cog):
-    bot: commands.Bot
-
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.moderators = {}
         self.ctx_register_moderator = app_commands.ContextMenu(
@@ -77,6 +99,13 @@ class Mod_manager(commands.Cog):
                 inline=False)
 
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(description="Configures the bot")
+    async def configure(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message("Configure", view=ConfigView())
+
+    def is_moderator_channel(self, channel: discord.abc.GuildChannel) -> None:
+        pass
 
 
 # ------------------------------MAIN CODE------------------------------
