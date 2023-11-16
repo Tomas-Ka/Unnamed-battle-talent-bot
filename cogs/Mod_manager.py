@@ -56,7 +56,7 @@ class ConfigView(discord.ui.View):
         self.stop()
 
 
-class Mod_manager(commands.Cog):
+class ModManager(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.moderators = {}
@@ -89,6 +89,7 @@ class Mod_manager(commands.Cog):
     async def on_audit_log_entry_create(self, entry: discord.AuditLogEntry):
         # make sure the audit log entry is a message deletion, and that it is done by a moderator
         # TODO check what channel the message was deleted from
+        channel_id = entry.extra.channel.id
         if entry.action == discord.AuditLogAction.message_delete and entry.user.id in self.moderators:
             self.moderators[entry.user.id][2] += 1
 
@@ -132,7 +133,7 @@ class Mod_manager(commands.Cog):
         await interaction.response.send_message("Configure", view=ConfigView(self))
 
     def is_moderator_channel(self, channel: discord.abc.GuildChannel) -> None:
-        pass
+        return channel.category.id == mod_category_id
 
 
 # ------------------------------MAIN CODE------------------------------
@@ -140,4 +141,4 @@ class Mod_manager(commands.Cog):
 # and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.Mod_manager begin loading")
-    await bot.add_cog(Mod_manager(bot))
+    await bot.add_cog(ModManager(bot))
