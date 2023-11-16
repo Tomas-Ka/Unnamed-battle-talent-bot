@@ -5,44 +5,49 @@ import discord
 # TODO; WRITE DOCUMENTATION
 # I'm just too tired rn :P
 
-mod_category_id = 0 #! DELETE WHEN DATABASE
+mod_category_id = 0  # ! DELETE WHEN DATABASE
 
 
 class ConfigView(discord.ui.View):
-    def __init__(self, cog: commands.Cog) -> None: #! REMOVE COG WHEN DATABASE
+    def __init__(self, cog: commands.Cog) -> None:  # ! REMOVE COG WHEN DATABASE
         super().__init__()
         self.mod_category_id = 0
         self.mod_category_name = "Null"
         self.roles = []
-        self.cog = cog #! REMOVE WHEN DATABASE
-    
-    @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.category], placeholder="Select moderator category")
+        self.cog = cog  # ! REMOVE WHEN DATABASE
+
+    @discord.ui.select(cls=discord.ui.ChannelSelect,
+                       channel_types=[discord.ChannelType.category],
+                       placeholder="Select moderator category")
     async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
         self.mod_category_id = select.values[0].id
         self.mod_category_name = select.values[0].name
         await interaction.response.defer()
-    
-    @discord.ui.select(cls=discord.ui.RoleSelect , placeholder="Select moderator roles to track stats for", min_values=0, max_values=25)
+
+    @discord.ui.select(cls=discord.ui.RoleSelect,
+                       placeholder="Select moderator roles to track stats for",
+                       min_values=0,
+                       max_values=25)
     async def role_select(self, interaction: discord.Interaction, select: discord.ui.RoleSelect) -> None:
         self.roles = select.values
         await interaction.response.defer()
 
     @discord.ui.button(style=discord.ButtonStyle.success, label="Confirm")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        mod_category_id = self.mod_category_id #! DELETE WHEN DATABASE
-        if(self.mod_category_id == 0):
+        mod_category_id = self.mod_category_id  # ! DELETE WHEN DATABASE
+        if (self.mod_category_id == 0):
             await interaction.response.send_message("You have to select a category!", ephemeral=True)
             return
-        
+
         for role in self.roles:
             for member in role.members:
-                if member.id not in self.cog.moderators: #! EDIT WHEN DATABASE
-                    self.cog.moderators[member.id] = [0, 0, 0] #! SEE COMMENT ABOVE
+                if member.id not in self.cog.moderators:  # ! EDIT WHEN DATABASE
+                    self.cog.moderators[member.id] = [0, 0, 0]
 
         self.confirm.disabled = True
         self.channel_select.disabled = True
         self.role_select.disabled = True
-        #TODO; make this response an embed
+        # TODO; make this response an embed
         if self.roles:
             await interaction.channel.send(f"mod category is: {self.mod_category_name}\n you have registered the following roles as admins: {', '.join([r.name for r in self.roles])[:-2]}")
         else:
@@ -123,7 +128,8 @@ class Mod_manager(commands.Cog):
 
     @app_commands.command(description="Configures the bot")
     async def configure(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_message("Configure", view=ConfigView(self)) #! REMOVE SELF WHEN DATABASE
+        # ! REMOVE SELF WHEN DATABASE
+        await interaction.response.send_message("Configure", view=ConfigView(self))
 
     def is_moderator_channel(self, channel: discord.abc.GuildChannel) -> None:
         pass
