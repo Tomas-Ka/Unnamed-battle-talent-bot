@@ -5,8 +5,12 @@ from helpers import Action, Moderator, StickyMessage, VacationWeek
 
 
 class DBHandler():
-    def __init__(self, path):
-        # TODO docstring
+    def __init__(self, path: str):
+        """A class that handles any needed queries to the database.
+
+        Args:
+            path (str): The filepath of the database to load from
+        """
         self.connection = sqlite3.connect(path)
         self.connection.execute("PRAGMA foreign_keys = ON;")
         print("Connection to SQLite DB successful")
@@ -45,7 +49,10 @@ class DBHandler():
         except Error as e:
             print(f"The error '{e}' occurred")
 
-    def _execute_multiple_read_query(self, query: str) -> List[Tuple]:
+    def _execute_multiple_read_query(
+            self,
+            query: str,
+            vars: Tuple = ()) -> List[Tuple]:
         """Executes the given query with the object's databse, returning
         a list of Tuples. Is used for reading from the database
 
@@ -58,7 +65,7 @@ class DBHandler():
         cursor = self.connection.cursor()
         result = None
         try:
-            cursor.execute(query)
+            cursor.execute(query, vars)
             result = cursor.fetchall()
             return result
         except Error as e:
@@ -66,6 +73,7 @@ class DBHandler():
 
 
 # -------------------------- STICKY HANDLING --------------------------
+
 
     def create_sticky(self, channel_id: int, message_id: int) -> None:
         """Adds a new sticky to the object's database.
@@ -128,7 +136,7 @@ class DBHandler():
                 sticky_query, (channel_id,))[1])
 
     def get_all_stickies(self) -> List[StickyMessage]:
-        """Returns a list of all stickies in the database.
+        """Returns a list of all stickies in the object's database.
 
         Returns:
             List[StickyMessage]: A list of StickyMessage objects
@@ -142,6 +150,7 @@ class DBHandler():
 
 
 # --------------------------- MOD HANDLING ----------------------------
+
 
     def register_moderator(
             self, user_id: int, quotas: Tuple[int, int, int]) -> None:
@@ -336,6 +345,7 @@ class DBHandler():
 
 # -------------------------- ACTION HANDLING --------------------------
 
+
     def create_action(
             self,
             action_type: str,
@@ -378,37 +388,202 @@ class DBHandler():
         Returns:
             List[Action]: A list containing a tuple of action type (sent, edited or deleted), the message id and the channel id.
         """
-        pass
-    # TODO; finish
+        action_get_query = """
+        SELECT
+            *
+        FROM
+            actions
+        WHERE
+            "timestamp"
+        BETWEEN
+            ?
+        AND
+            ?
+        AND
+            "mod_id" = ?
+        """
+        return [
+            Action(
+                action[0],
+                action[1],
+                action[3],
+                action[4],
+                action[5],
+                message_id=action[2]) for action in self._execute_multiple_read_query(
+                action_get_query,
+                (start_time,
+                 end_time,
+                 moderator_id,
+                 ))]
 
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
 
-    def add_vacation_week(self, user_id: int, date: str) -> None:
+
+    def add_vacation_week(self, moderator_id: int, date: str) -> None:
+        """Adds a new action to the object's database.
+
+        Args:
+            moderator_id (int): Discord ID of the moderator to bind the vacation to.
+            date (str): The week that is being taken as vacation, format "YYYY-WW".
+        """
         vacation_week_add_query = """
         INSERT INTO
             vacation_weeks (date, mod_id)
         VALUES
             (?,?);
         """
-        self._execute_query(vacation_week_add_query, (date, user_id,))
+        self._execute_query(vacation_week_add_query, (date, moderator_id,))
 
     def remove_vacation_week(self, user_id: int, date: str) -> None:
+        """Remove an action from the object's database given a user_id and date.
+
+        Args:
+            user_id (int): Discord ID of the moderator to bind the vacation to.
+            date (str): The week that of the vacation, format "YYYY-WW".
+        """
         vacation_week_remove_query = """
         DELETE FROM vacation_weeks
         WHERE
             date = ?,
             user_id = ?
         """
-        self._execute_query(vacation_table_query, (user_id, date,))
+        self._execute_query(vacation_week_remove_query, (date, user_id,))
+
+    def get_all_vacation_weeks(self, user_id: int) -> List[VacationWeek]:
+        """Returns a list of all vacation weeks in the object's database.
+
+        Args:
+            user_id (int): Discord ID of the moderator to get the vacation from.
+
+        Returns:
+            List[VacationWeek]: List of all vacation weeks for the given user.
+        """
+        vacation_week_get_query = """
+        SELECT
+            *
+        FROM
+            vacation_weeks
+        WHERE
+            user_id = ?
+        """
+        return [
+            VacationWeek(
+                *w) for w in self._execute_read_query(
+                vacation_week_get_query,
+                (user_id,
+                 ))]
+
+    def get_all_vacation_weeks_during_period(
+            self,
+            user_id: int,
+            start_date: str,
+            end_date: str) -> List[VacationWeek]:
+        """Returns a list of all vacation weeks during a period in the object's database given a user_id and the time frame.
+
+        Args:
+            user_id (int): Discord ID of the moderator to get the vacation from.
+            start_date (str): Beginning of the timeframe (format "YYYY-MM").
+            end_date (str): End of the timeframe (format "YYYY-MM").
+
+        Returns:
+            List[VacationWeek]: List of all vacation weeks for the given user during the given time period.
+        """
+        vacation_week_get_query = """
+        SELECT
+            *
+        FROM
+            vacation_weeks
+        WHERE
+            date
+        BETWEEN
+            ?
+        AND
+            ?
+        AND
+            "mod_id" = ?
+        """
+        return [
+            VacationWeek(
+                *w) for w in self._execute_read_query(
+                vacation_week_get_query,
+                (start_date,
+                 end_date,
+                 user_id,
+                 ))]
 
     def is_vacation_week(self, user_id: int, date: str) -> bool:
-        return True
-        # TODO; write
+        """Checks if a given user has taken the given week as vacation.
+
+        Args:
+            user_id (int): Discord ID of the moderator the check vacation for.
+            date (str): The week of the vacation to check, format "YYYY-WW".
+
+        Returns:
+            bool: If the given week was vacation for the given user.
+        """
+        vacation_week_check_query = """
+        SELECT
+            *
+        FROM
+            vacation_weeks
+        WHERE
+            mod_id = ?,
+            date = ?
+        """
+        if self._execute_read_query(
+                vacation_week_check_query, (user_id, date,)):
+            return True
+        return False
 
     def amount_of_vacation_weeks(self, user_id: int) -> int:
-        return 0
-        # TODO; write
+        """Returns the number of total vacation weeks a user has taken.
+
+        Args:
+            user_id (int): Discord ID of the moderator to count vacation weeks for.
+
+        Returns:
+            int: The amount of total vacation weeks.
+        """
+        vacation_week_count_query = """
+        SELECT
+            *
+        FROM
+            vacation_weeks
+        WHERE
+            user_id = ?
+        """
+        return len(self._execute_multiple_read_query(
+            vacation_week_count_query, (user_id,)))
+
+    def amount_of_vacation_weeks_during_period(
+            self, user_id: int, start_date: str, end_date: str) -> int:
+        """Returns the number of vacation weeks a user has taken between the given dates.
+
+        Args:
+            user_id (int): Discord ID of the moderator to count vacation weeks for.
+            start_date (str): The beginning of the time period to check. Format "YYYY-WW".
+            end_date (str): The end of the time period to check (inclusive). Format "YYYY-WW".
+
+        Returns:
+            int: The amount of vacation weeks during the period.
+        """
+        vacation_week_count_query = """
+        SELECT
+            *
+        FROM
+            vacation_weeks
+        WHERE
+            date
+        BETWEEN
+            ?
+        AND
+            ?
+        AND
+            "mod_id" = ?
+        """
+        return len(self._execute_multiple_read_query(
+            vacation_week_count_query, (start_date, end_date, user_id)))
 
 
 if __name__ == "__main__":
