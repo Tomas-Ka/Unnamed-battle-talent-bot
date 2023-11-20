@@ -131,9 +131,13 @@ class DBHandler():
 
         # Return the message_id of the entry in the database as a StickyMessage
         # (second value of the tuple)
-        return StickyMessage(
-            *self._execute_read_query(
-                sticky_query, (channel_id,))[1])
+
+        result = self._execute_read_query(
+                sticky_query, (channel_id,))
+        
+        if result:
+            return StickyMessage(*result)
+        return None
 
     def get_all_stickies(self) -> List[StickyMessage]:
         """Returns a list of all stickies in the object's database.
@@ -144,9 +148,12 @@ class DBHandler():
         sticky_query = """
         SELECT * FROM stickies
         """
-        return [
-            StickyMessage(
-                *sticky) for sticky in self._execute_multiple_read_query(sticky_query)]
+        
+        result = self._execute_multiple_read_query(sticky_query)
+        
+        if result:
+            return [StickyMessage(*sticky) for sticky in result]
+        return []
 
 
 # --------------------------- MOD HANDLING ----------------------------
@@ -160,16 +167,16 @@ class DBHandler():
             user_id (int): Discord id of the user.
             quotas (Tuple[int, int, int]): The quotas the user should reach weekly.
         """
-        # There is most certainly a smarter way to do this, but it works...
         mod_test = self.get_moderator(user_id)
         if mod_test:
-            if mod_test[5] == 0:
+            if mod_test.active == 0:
                 moderator_registration_query = """
                 UPDATE moderators
                 SET
-                    send_quota = ?
-                    edit_quota = ?
-                    delete_quota = ?
+                    send_quota = ?,
+                    edit_quota = ?,
+                    delete_quota = ?,
+                    vacation_days = 0,
                     active = 1
                 WHERE
                     user_id = ?
@@ -177,6 +184,8 @@ class DBHandler():
                 self._execute_query(
                     moderator_registration_query, (*quotas, user_id,))
                 return
+            else:
+                raise(ValueError(f"User with id: {user_id} already exists."))
 
         moderator_registration_query = """
         INSERT INTO
@@ -297,11 +306,10 @@ class DBHandler():
         moderator_de_registration_query = """
         UPDATE moderators
         SET
-            active = 0
-            consecutive_completed_weeks = 0
-            vacation_days = 0
-            send_quota = 0
-            edit_quota = 0
+            active = 0,
+            consecutive_completed_weeks = 0,
+            send_quota = 0,
+            edit_quota = 0,
             delete_quota = 0
         WHERE
             user_id = ?
@@ -322,25 +330,48 @@ class DBHandler():
         WHERE
             user_id = ?
         """
-        return Moderator(
-            *
-            self._execute_read_query(
-                moderator_get_query,
-                (user_id,
-                 )))
+        result = self._execute_read_query(
+                    moderator_get_query,(user_id,))
+        
+        if result:
+            return Moderator(*result)
+        return None
 
     def get_all_moderators(self) -> List[Moderator]:
-        """Returns a list of all moderators in the object's database
+        """Returns a list of all active moderators in the object's database
 
         Returns:
             List[Moderator]: List of Moderator objects
         """
         moderator_get_query = """
         SELECT * FROM moderators
+        WHERE
+            active = 1
         """
-        return [
-            Moderator(
-                *mod) for mod in self._execute_multiple_read_query(moderator_get_query)]
+        result = self._execute_multiple_read_query(
+                    moderator_get_query)
+        
+        if result:
+            return [Moderator(*mod) for mod in result]
+        return []
+    
+    def get_all_inactive_moderators(self) -> List[Moderator]:
+        """Returns a list of all inactive moderators in the object's database
+
+        Returns:
+            List[Moderator]: List of Moderator objects
+        """
+        moderator_get_query = """
+        SELECT * FROM moderators
+        WHERE
+            active = 0
+        """
+        result = self._execute_multiple_read_query(
+                    moderator_get_query)
+        
+        if result:
+            return [Moderator(*mod) for mod in result]
+        return []
 
 
 # -------------------------- ACTION HANDLING --------------------------
@@ -376,7 +407,7 @@ class DBHandler():
              moderator_id,
              timestamp))
 
-    def get_actions(self, start_time: int, end_time: int,
+    def get_all_actions(self, start_time: int, end_time: int,
                     moderator_id: int) -> List[Action]:
         """Returns a list of all action sent by the given moderator in the given timeframe.
 
@@ -389,10 +420,7 @@ class DBHandler():
             List[Action]: A list containing a tuple of action type (sent, edited or deleted), the message id and the channel id.
         """
         action_get_query = """
-        SELECT
-            *
-        FROM
-            actions
+        SELECT * FROM actions
         WHERE
             "timestamp"
         BETWEEN
@@ -402,19 +430,18 @@ class DBHandler():
         AND
             "mod_id" = ?
         """
-        return [
-            Action(
-                action[0],
-                action[1],
-                action[3],
-                action[4],
-                action[5],
-                message_id=action[2]) for action in self._execute_multiple_read_query(
+        result = list(self._execute_multiple_read_query(
                 action_get_query,
-                (start_time,
-                 end_time,
-                 moderator_id,
-                 ))]
+                (start_time, end_time, moderator_id,)))
+        result_list = []
+        
+        if result:
+            result = [list(entry) for entry in result]
+            message_ids = [m.pop(2) for m in result]
+            for i in range(0, len(result)):
+                result_list.append(Action(*result[i], message_id=message_ids[i]))
+            
+        return result_list
 
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
@@ -445,8 +472,9 @@ class DBHandler():
         vacation_week_remove_query = """
         DELETE FROM vacation_weeks
         WHERE
-            date = ?,
-            user_id = ?
+            date = ?
+        AND
+            mod_id = ?
         """
         self._execute_query(vacation_week_remove_query, (date, user_id,))
 
@@ -460,19 +488,16 @@ class DBHandler():
             List[VacationWeek]: List of all vacation weeks for the given user.
         """
         vacation_week_get_query = """
-        SELECT
-            *
-        FROM
-            vacation_weeks
+        SELECT * FROM vacation_weeks
         WHERE
-            user_id = ?
+            mod_id = ?
         """
-        return [
-            VacationWeek(
-                *w) for w in self._execute_read_query(
-                vacation_week_get_query,
-                (user_id,
-                 ))]
+        result = self._execute_multiple_read_query(
+                vacation_week_get_query, (user_id,))
+        
+        if result:
+            return [VacationWeek(*week) for week in result]
+        return []
 
     def get_all_vacation_weeks_during_period(
             self,
@@ -490,10 +515,7 @@ class DBHandler():
             List[VacationWeek]: List of all vacation weeks for the given user during the given time period.
         """
         vacation_week_get_query = """
-        SELECT
-            *
-        FROM
-            vacation_weeks
+        SELECT * FROM vacation_weeks
         WHERE
             date
         BETWEEN
@@ -503,14 +525,14 @@ class DBHandler():
         AND
             "mod_id" = ?
         """
-        return [
-            VacationWeek(
-                *w) for w in self._execute_read_query(
+        result = self._execute_multiple_read_query(
                 vacation_week_get_query,
                 (start_date,
                  end_date,
-                 user_id,
-                 ))]
+                 user_id,))
+        if result:
+            return [VacationWeek(*w) for w in result]
+        return []
 
     def is_vacation_week(self, user_id: int, date: str) -> bool:
         """Checks if a given user has taken the given week as vacation.
@@ -523,12 +545,10 @@ class DBHandler():
             bool: If the given week was vacation for the given user.
         """
         vacation_week_check_query = """
-        SELECT
-            *
-        FROM
-            vacation_weeks
+        SELECT * FROM vacation_weeks
         WHERE
-            mod_id = ?,
+            mod_id = ?
+        AND
             date = ?
         """
         if self._execute_read_query(
@@ -546,12 +566,9 @@ class DBHandler():
             int: The amount of total vacation weeks.
         """
         vacation_week_count_query = """
-        SELECT
-            *
-        FROM
-            vacation_weeks
+        SELECT * FROM vacation_weeks
         WHERE
-            user_id = ?
+            mod_id = ?
         """
         return len(self._execute_multiple_read_query(
             vacation_week_count_query, (user_id,)))

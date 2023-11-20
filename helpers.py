@@ -1,5 +1,5 @@
 from typing import Tuple
-from datetime import date
+from datetime import date, datetime
 
 
 class Action:
@@ -112,8 +112,7 @@ class VacationWeek:
         Returns:
             date: A datetime object for the monday of the given week
         """
-        date = self.date.split("-")
-        date.fromisoformat(date[0] + "-W" + date[1] + "-1")
+        return datetime.strptime(self.date + "-1", "%Y-%W-%w")
 
     @dateobj.setter
     def dateobj(self, date: date):
