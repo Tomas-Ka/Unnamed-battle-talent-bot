@@ -11,7 +11,7 @@ class Action:
             mod_id: int,
             timestamp: int,
             message_id: int = None):
-        """Represents an action object.
+        """Represents an action.
 
         Args:
             id (int): Database id.
@@ -42,7 +42,7 @@ class Moderator:
             consecutive_completed_weeks: int,
             vacation_days: int,
             active: int) -> None:
-        """Represents a moderator object.
+        """Represents a moderator.
 
         Args:
             user_id (int): Discord id of the moderator.
@@ -95,8 +95,8 @@ class StickyMessage:
 
 
 class VacationWeek:
-    def __init__(self, date: str, mod_id: int):
-        """Represents a vaction week object.
+    def __init__(self, date: str, mod_id: int) -> None:
+        """Represents a vaction week.
 
         Args:
             date (str): Date of the week in the form yyyy-ww.
@@ -122,3 +122,24 @@ class VacationWeek:
             date (date): Datetime object for the week we wish to update to.
         """
         self.date = date.strftime('%Y-%W')
+
+
+class Guild:
+    def __init__(
+            self,
+            guild_id: int,
+            mod_category_id: int,
+            last_mod_check: int,
+            time_between_checks: int) -> None:
+        """Represents a guild config entry.
+
+        Args:
+            guild_id (int): The guild id for the guild.
+            mod_category_id (int): The id of the mod category.
+            last_mod_check (int): Unix timestamp for last time the moderator stats were checked.
+            time_between_checks (int): The amount of seconds that we should wait before next mod check.
+        """
+        self.guild_id = guild_id
+        self.mod_category_id = mod_category_id
+        self.last_mod_check = last_mod_check
+        self.time_between_checks = time_between_checks

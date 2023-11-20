@@ -1,7 +1,7 @@
 import sqlite3
 from sqlite3 import Error
 from typing import List, Tuple
-from helpers import Action, Moderator, StickyMessage, VacationWeek
+from helpers import Action, Moderator, StickyMessage, VacationWeek, Guild
 
 
 class DBHandler():
@@ -74,7 +74,6 @@ class DBHandler():
 
 # -------------------------- STICKY HANDLING --------------------------
 
-
     def create_sticky(self, channel_id: int, message_id: int) -> None:
         """Adds a new sticky to the object's database.
 
@@ -133,8 +132,8 @@ class DBHandler():
         # (second value of the tuple)
 
         result = self._execute_read_query(
-                sticky_query, (channel_id,))
-        
+            sticky_query, (channel_id,))
+
         if result:
             return StickyMessage(*result)
         return None
@@ -148,16 +147,15 @@ class DBHandler():
         sticky_query = """
         SELECT * FROM stickies
         """
-        
+
         result = self._execute_multiple_read_query(sticky_query)
-        
+
         if result:
             return [StickyMessage(*sticky) for sticky in result]
         return []
 
 
 # --------------------------- MOD HANDLING ----------------------------
-
 
     def register_moderator(
             self, user_id: int, quotas: Tuple[int, int, int]) -> None:
@@ -185,7 +183,7 @@ class DBHandler():
                     moderator_registration_query, (*quotas, user_id,))
                 return
             else:
-                raise(ValueError(f"User with id: {user_id} already exists."))
+                raise (ValueError(f"User with id: {user_id} already exists."))
 
         moderator_registration_query = """
         INSERT INTO
@@ -331,8 +329,8 @@ class DBHandler():
             user_id = ?
         """
         result = self._execute_read_query(
-                    moderator_get_query,(user_id,))
-        
+            moderator_get_query, (user_id,))
+
         if result:
             return Moderator(*result)
         return None
@@ -349,12 +347,12 @@ class DBHandler():
             active = 1
         """
         result = self._execute_multiple_read_query(
-                    moderator_get_query)
-        
+            moderator_get_query)
+
         if result:
             return [Moderator(*mod) for mod in result]
         return []
-    
+
     def get_all_inactive_moderators(self) -> List[Moderator]:
         """Returns a list of all inactive moderators in the object's database
 
@@ -367,15 +365,14 @@ class DBHandler():
             active = 0
         """
         result = self._execute_multiple_read_query(
-                    moderator_get_query)
-        
+            moderator_get_query)
+
         if result:
             return [Moderator(*mod) for mod in result]
         return []
 
 
 # -------------------------- ACTION HANDLING --------------------------
-
 
     def create_action(
             self,
@@ -408,7 +405,7 @@ class DBHandler():
              timestamp))
 
     def get_all_actions(self, start_time: int, end_time: int,
-                    moderator_id: int) -> List[Action]:
+                        moderator_id: int) -> List[Action]:
         """Returns a list of all action sent by the given moderator in the given timeframe.
 
         Args:
@@ -431,21 +428,23 @@ class DBHandler():
             "mod_id" = ?
         """
         result = list(self._execute_multiple_read_query(
-                action_get_query,
-                (start_time, end_time, moderator_id,)))
+            action_get_query,
+            (start_time, end_time, moderator_id,)))
         result_list = []
-        
+
         if result:
             result = [list(entry) for entry in result]
             message_ids = [m.pop(2) for m in result]
             for i in range(0, len(result)):
-                result_list.append(Action(*result[i], message_id=message_ids[i]))
-            
+                result_list.append(
+                    Action(
+                        *result[i],
+                        message_id=message_ids[i]))
+
         return result_list
 
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
-
 
     def add_vacation_week(self, moderator_id: int, date: str) -> None:
         """Adds a new action to the object's database.
@@ -493,8 +492,8 @@ class DBHandler():
             mod_id = ?
         """
         result = self._execute_multiple_read_query(
-                vacation_week_get_query, (user_id,))
-        
+            vacation_week_get_query, (user_id,))
+
         if result:
             return [VacationWeek(*week) for week in result]
         return []
@@ -526,10 +525,10 @@ class DBHandler():
             "mod_id" = ?
         """
         result = self._execute_multiple_read_query(
-                vacation_week_get_query,
-                (start_date,
-                 end_date,
-                 user_id,))
+            vacation_week_get_query,
+            (start_date,
+             end_date,
+             user_id,))
         if result:
             return [VacationWeek(*w) for w in result]
         return []
@@ -586,10 +585,7 @@ class DBHandler():
             int: The amount of vacation weeks during the period.
         """
         vacation_week_count_query = """
-        SELECT
-            *
-        FROM
-            vacation_weeks
+        SELECT * FROM vacation_weeks
         WHERE
             date
         BETWEEN
@@ -600,7 +596,98 @@ class DBHandler():
             "mod_id" = ?
         """
         return len(self._execute_multiple_read_query(
-            vacation_week_count_query, (start_date, end_date, user_id)))
+            vacation_week_count_query, (start_date, end_date, user_id,)))
+
+
+# -------------------------- CONFIG HANDLING --------------------------
+
+    def add_guild(self, guild_id: int) -> None:
+        """Creates a new entry for the given guild in the database.
+
+        Args:
+            guild_id (int): The id of the guild.
+        """
+        guild_add_query = """
+        INSERT INTO
+            config(guild_id)
+        VALUES
+            (?);
+        """
+        self._execute_query(guild_add_query, (guild_id,))
+
+    def set_mod_category_id(self, guild_id: int, mod_category_id: int) -> None:
+        """Sets the mod category ID in the given guild to the given value.
+
+        Args:
+            guild_id (int): The id of the guild to update the mod category id in.
+            mod_category_id (int): The new id.
+        """
+        mod_category_id_edit_query = """
+        UPDATE config
+        SET
+            mod_category_id = ?
+        WHERE
+            guild_id = ?
+        """
+        self._execute_query(mod_category_id_edit_query,
+                            (mod_category_id, guild_id,))
+
+    def set_last_mod_check(self, guild_id: int, last_mod_check: int) -> None:
+        """Sets the last_mod_check timestamp in the given guild to the given value.
+
+        Args:
+            guild_id (int): The id of the guild to update the timestamp in.
+            last_mod_check (int): The new timestamp.
+        """
+        last_mod_check_edit_query = """
+        UPDATE config
+        SET
+            last_mod_check = ?
+        WHERE
+            guild_id = ?
+        """
+        self._execute_query(last_mod_check_edit_query,
+                            (last_mod_check, guild_id,))
+
+    def set_time_between_checks(
+            self,
+            guild_id: int,
+            time_between_checks: int) -> None:
+        """Sets time_between_checks in the given guild to the given value.
+
+        Args:
+            guild_id (int): The id of the guild to update the value in.
+            time_between_checks (int): The new value.
+        """
+        time_between_checks_edit_query = """
+        UPDATE config
+        SET
+            time_between_checks = ?
+        WHERE
+            guild_id = ?
+        """
+        self._execute_query(time_between_checks_edit_query,
+                            (time_between_checks, guild_id,))
+
+    def get_guild(self, guild_id: int) -> Guild:
+        guild_get_query = """
+        SELECT * FROM config
+        WHERE
+            guild_id = ?
+        """
+        result = self._execute_read_query(guild_get_query, (guild_id,))
+        if result:
+            return Guild(*result)
+        return None
+
+    def get_all_guilds(self) -> List[Guild]:
+        guild_get_query = """
+        SELECT * FROM config
+        """
+        result = self._execute_multiple_read_query(guild_get_query)
+        if result:
+            return [Guild(*guild) for guild in result]
+        return []
 
 
 if __name__ == "__main__":
@@ -645,3 +732,12 @@ if __name__ == "__main__":
         "mod_id" INTEGER REFERENCES moderators NOT NULL
     )"""
     DB._execute_query(vacation_table_query)
+
+    config_table_query = """
+    CREATE TABLE IF NOT EXISTS config (
+        "guild_id" INTEGER PRIMARY KEY,
+        "mod_category_id" INTEGER,
+        "last_mod_check" INTEGER,
+        "time_between_checks" INTEGER
+    );"""
+    DB._execute_query(config_table_query)
