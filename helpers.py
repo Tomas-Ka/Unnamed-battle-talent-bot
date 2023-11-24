@@ -1,4 +1,3 @@
-from typing import Tuple
 from datetime import date, datetime
 
 
@@ -22,10 +21,10 @@ class Action:
             message_id (int, optional): Id of the message the action is referencing (does not exist when action is "deleted"). Defaults to None.
         """
         self.id = id
-        if type not in ["sent", "edited", "deleted"]:
+        if type.lower() not in ["sent", "edited", "deleted"]:
             raise ValueError(
                 f'"{type}" is not a valid type ("sent", "edited" or "deleted")')
-        self.type = type
+        self.type = type.lower()
         self.channel_id = channel_id
         self.mod_id = mod_id
         self.timestamp = timestamp
@@ -62,20 +61,20 @@ class Moderator:
         self.active = active
 
     @property
-    def quotas(self) -> Tuple[int, int, int]:
+    def quotas(self) -> tuple[int, int, int]:
         """Another interaface to the three quotas. Let's you use *Moderator.quotas to simplify function calls.
 
         Returns:
-            Tuple[int, int, int]: Returns the send, edit and delete quotas of the mod, in that order.
+            tuple[int, int, int]: Returns the send, edit and delete quotas of the mod, in that order.
         """
         return [self.send_quota, self.edit_quota, self.delete_quota]
 
     @quotas.setter
-    def quotas(self, value: Tuple[int, int, int]) -> None:
+    def quotas(self, value: tuple[int, int, int]) -> None:
         """Another interface to the three quotas. Let's you easily set all of them at the same time.
 
         Args:
-            value (Tuple[int, int, int]): New values for the send, edit and delete quotas, in that order.
+            value (tuple[int, int, int]): New values for the send, edit and delete quotas, in that order.
         """
         self.send_quota = value[0]
         self.edit_quota = value[1]
@@ -130,7 +129,8 @@ class Guild:
             guild_id: int,
             mod_category_id: int,
             last_mod_check: int,
-            time_between_checks: int) -> None:
+            time_between_checks: int,
+            default_quotas: str | tuple[int, int, int]) -> None:
         """Represents a guild config entry.
 
         Args:
@@ -138,8 +138,14 @@ class Guild:
             mod_category_id (int): The id of the mod category.
             last_mod_check (int): Unix timestamp for last time the moderator stats were checked.
             time_between_checks (int): The amount of seconds that we should wait before next mod check.
+            default_quota (str | tuple): The default quota for any new moderators.
         """
-        self.guild_id = guild_id
+
+        if isinstance(default_quotas, str):
+            default_quotas = tuple([i for i in default_quotas])
+
+        self.id = guild_id
         self.mod_category_id = mod_category_id
         self.last_mod_check = last_mod_check
         self.time_between_checks = time_between_checks
+        self.default_quotas: tuple[int, int, int] = default_quotas

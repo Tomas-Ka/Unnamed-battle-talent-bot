@@ -5,6 +5,7 @@ import traceback
 from discord.ext import commands
 from dotenv import load_dotenv
 from os import environ, listdir
+from db_handler import DBHandler
 
 load_dotenv()
 token = environ["TEST_TOKEN"]
@@ -37,7 +38,7 @@ class BTBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         # any data processing to get stuff into memory goes here
-
+        self.db = DBHandler("./db.sqlite")
         # load cogs:
         print("loading cogs:")
         cogs = [f"cogs.{c[:-3]}" for c in listdir("./cogs") if c[-3:] == ".py"]

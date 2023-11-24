@@ -1,6 +1,5 @@
 import sqlite3
 from sqlite3 import Error
-from typing import List, Tuple
 from helpers import Action, Moderator, StickyMessage, VacationWeek, Guild
 
 
@@ -15,12 +14,12 @@ class DBHandler():
         self.connection.execute("PRAGMA foreign_keys = ON;")
         print("Connection to SQLite DB successful")
 
-    def _execute_query(self, query: str, vars: Tuple = ()) -> None:
+    def _execute_query(self, query: str, vars: tuple = ()) -> None:
         """Execute the given query with the object's database.
 
         Args:
             query (str): The query string.
-            vars (Tuple, optional): The vars to replace the spots in the query string. Defaults to ()
+            vars (tuple, optional): The vars to replace the spots in the query string. Defaults to ()
         """
         cursor = self.connection.cursor()
         try:
@@ -29,16 +28,16 @@ class DBHandler():
             print(f"The error '{e}' occurred")
         self.connection.commit()
 
-    def _execute_read_query(self, query: str, vars: Tuple = ()) -> Tuple:
+    def _execute_read_query(self, query: str, vars: tuple = ()) -> tuple:
         """Executes the given query with the object's database, returning
-        a single Tuple. Is used for reading from the DB.
+        a single tuple. Is used for reading from the DB.
 
         Args:
             query (str): The string to query the database with.
-            vars (Tuple, optional): The vars to replace the spots in the query string. Defaults to ()
+            vars (tuple, optional): The vars to replace the spots in the query string. Defaults to ()
 
         Returns:
-            Tuple: A Touple containing the data at the found row.
+            tuple: A Touple containing the data at the found row.
         """
         cursor = self.connection.cursor()
         result = None
@@ -52,7 +51,7 @@ class DBHandler():
     def _execute_multiple_read_query(
             self,
             query: str,
-            vars: Tuple = ()) -> List[Tuple]:
+            vars: tuple = ()) -> list[tuple]:
         """Executes the given query with the object's databse, returning
         a list of Tuples. Is used for reading from the database
 
@@ -60,7 +59,7 @@ class DBHandler():
             query (str): The string to query the database with.
 
         Returns:
-            List[Tuple]: a list containing all the data found from the query.
+            list[tuple]: a list containing all the data found from the query.
         """
         cursor = self.connection.cursor()
         result = None
@@ -73,6 +72,7 @@ class DBHandler():
 
 
 # -------------------------- STICKY HANDLING --------------------------
+
 
     def create_sticky(self, channel_id: int, message_id: int) -> None:
         """Adds a new sticky to the object's database.
@@ -138,11 +138,11 @@ class DBHandler():
             return StickyMessage(*result)
         return None
 
-    def get_all_stickies(self) -> List[StickyMessage]:
+    def get_all_stickies(self) -> list[StickyMessage]:
         """Returns a list of all stickies in the object's database.
 
         Returns:
-            List[StickyMessage]: A list of StickyMessage objects
+            list[StickyMessage]: A list of StickyMessage objects
         """
         sticky_query = """
         SELECT * FROM stickies
@@ -158,12 +158,12 @@ class DBHandler():
 # --------------------------- MOD HANDLING ----------------------------
 
     def register_moderator(
-            self, user_id: int, quotas: Tuple[int, int, int]) -> None:
+            self, user_id: int, quotas: tuple[int, int, int]) -> None:
         """Adds a new moderator to the object's database.
 
         Args:
             user_id (int): Discord id of the user.
-            quotas (Tuple[int, int, int]): The quotas the user should reach weekly.
+            quotas (tuple[int, int, int]): The quotas the user should reach weekly.
         """
         mod_test = self.get_moderator(user_id)
         if mod_test:
@@ -193,12 +193,12 @@ class DBHandler():
         """
         self._execute_query(moderator_registration_query, (user_id, *quotas,))
 
-    def set_quota(self, user_id: int, quotas: Tuple[int, int, int]) -> None:
+    def set_quota(self, user_id: int, quotas: tuple[int, int, int]) -> None:
         """Edits the weekly quota for the given user in the object's database.
 
         Args:
             user_id (int): Discord id of the user to edit.
-            quotas (Tuple[int, int, int]): The new weekly quotas for the user.
+            quotas (tuple[int, int, int]): The new weekly quotas for the user.
         """
         moderator_edit_query = """
         UPDATE moderators
@@ -211,11 +211,11 @@ class DBHandler():
         """
         self._execute_query(moderator_edit_query, (*quotas, user_id,))
 
-    def set_all_quotas(self, quotas: Tuple[int, int, int]) -> None:
+    def set_all_quotas(self, quotas: tuple[int, int, int]) -> None:
         """Edits the weekly quota for all the users in the object's database.
 
         Args:
-            quotas (Tuple[int, int, int]): The new weekly quota for all users.
+            quotas (tuple[int, int, int]): The new weekly quota for all users.
         """
         # make sure we don't change removed moderators
         moderator_edit_query = """
@@ -335,11 +335,11 @@ class DBHandler():
             return Moderator(*result)
         return None
 
-    def get_all_moderators(self) -> List[Moderator]:
+    def get_all_moderators(self) -> list[Moderator]:
         """Returns a list of all active moderators in the object's database
 
         Returns:
-            List[Moderator]: List of Moderator objects
+            list[Moderator]: List of Moderator objects
         """
         moderator_get_query = """
         SELECT * FROM moderators
@@ -353,11 +353,11 @@ class DBHandler():
             return [Moderator(*mod) for mod in result]
         return []
 
-    def get_all_inactive_moderators(self) -> List[Moderator]:
+    def get_all_inactive_moderators(self) -> list[Moderator]:
         """Returns a list of all inactive moderators in the object's database
 
         Returns:
-            List[Moderator]: List of Moderator objects
+            list[Moderator]: List of Moderator objects
         """
         moderator_get_query = """
         SELECT * FROM moderators
@@ -405,7 +405,7 @@ class DBHandler():
              timestamp))
 
     def get_all_actions(self, start_time: int, end_time: int,
-                        moderator_id: int) -> List[Action]:
+                        moderator_id: int) -> list[Action]:
         """Returns a list of all action sent by the given moderator in the given timeframe.
 
         Args:
@@ -414,7 +414,7 @@ class DBHandler():
             moderator_id (int): Id of the given moderator.
 
         Returns:
-            List[Action]: A list containing a tuple of action type (sent, edited or deleted), the message id and the channel id.
+            list[Action]: A list containing Action objects.
         """
         action_get_query = """
         SELECT * FROM actions
@@ -443,8 +443,77 @@ class DBHandler():
 
         return result_list
 
+    def get_all_actions_of_type(
+            self,
+            start_time: int,
+            end_time: int,
+            moderator_id: int,
+            type: str) -> list[Action]:
+        """Returns a list of of all actions with the specified type by the given moderator in the given timeframe
+
+        Args:
+            start_time (int): Beginning of the timeframe (unix timestamp).
+            end_time (int): End of the timeframe (unix timestamp).
+            moderator_id (int): Id of the given moderator.
+            type (str): a string containing the action type ("sent", "edited" or "deleted")
+
+        Returns:
+            list[Action]: A list containing all Action objects of the given type.
+        """
+
+        action_get_query = """
+        SELECT * FROM actions
+        WHERE "timestamp"
+        BETWEEN
+            ?
+        AND
+            ?
+        AND
+            "mod_id" = ?
+        AND
+            "type" = ?"""
+
+        result = list(self._execute_multiple_read_query(
+            action_get_query, (start_time, end_time, moderator_id, type,)))
+        result_list = []
+
+        if result:
+            result = [list(entry) for entry in result]
+            message_ids = [m.pop(2) for m in result]
+            for i in range(0, len(result)):
+                if result[i][1] == type:
+                    result_list.append(
+                        Action(
+                            *result[i],
+                            message_id=message_ids[i]))
+
+        return result_list
+
+    def get_amount_of_actions_by_type(
+            self, start_time: int, end_time: int, moderator_id: int) -> tuple[int, int, int]:
+        """Returns a tuple containing the amount of sent, edited and deleted messages by the given moderator in the given timeframe.
+        Format is always (sent, edited, deleted)
+
+        Args:
+            start_time (int): Beginning of the timeframe (unix timestamp).
+            end_time (int): End of the timeframe (unix timestamp).
+            moderator_id (int): Id of the given moderator.
+
+        Returns:
+            tuple[int, int, int]: A tuple containg the amount of hits for each category.
+        """
+        return (
+            len(
+                self.get_all_actions_of_type(
+                    start_time, end_time, moderator_id, "sent")), len(
+                self.get_all_actions_of_type(
+                    start_time, end_time, moderator_id, "edited")), len(
+                        self.get_all_actions_of_type(
+                            start_time, end_time, moderator_id, "deleted")))
+
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
+
 
     def add_vacation_week(self, moderator_id: int, date: str) -> None:
         """Adds a new action to the object's database.
@@ -477,14 +546,14 @@ class DBHandler():
         """
         self._execute_query(vacation_week_remove_query, (date, user_id,))
 
-    def get_all_vacation_weeks(self, user_id: int) -> List[VacationWeek]:
+    def get_all_vacation_weeks(self, user_id: int) -> list[VacationWeek]:
         """Returns a list of all vacation weeks in the object's database.
 
         Args:
             user_id (int): Discord ID of the moderator to get the vacation from.
 
         Returns:
-            List[VacationWeek]: List of all vacation weeks for the given user.
+            list[VacationWeek]: List of all vacation weeks for the given user.
         """
         vacation_week_get_query = """
         SELECT * FROM vacation_weeks
@@ -502,7 +571,7 @@ class DBHandler():
             self,
             user_id: int,
             start_date: str,
-            end_date: str) -> List[VacationWeek]:
+            end_date: str) -> list[VacationWeek]:
         """Returns a list of all vacation weeks during a period in the object's database given a user_id and the time frame.
 
         Args:
@@ -511,7 +580,7 @@ class DBHandler():
             end_date (str): End of the timeframe (format "YYYY-MM").
 
         Returns:
-            List[VacationWeek]: List of all vacation weeks for the given user during the given time period.
+            list[VacationWeek]: List of all vacation weeks for the given user during the given time period.
         """
         vacation_week_get_query = """
         SELECT * FROM vacation_weeks
@@ -601,19 +670,33 @@ class DBHandler():
 
 # -------------------------- CONFIG HANDLING --------------------------
 
-    def add_guild(self, guild_id: int) -> None:
+
+    def add_guild(self,
+                  guild_id: int,
+                  default_quotas: tuple[int,
+                                        int,
+                                        int],
+                  mod_category_id: int = None,
+                  last_mod_check: int = None,
+                  time_between_checks: int = None) -> None:
         """Creates a new entry for the given guild in the database.
 
         Args:
             guild_id (int): The id of the guild.
+            default_quotas (tuple[int, int, int]): The default quotas for new moderators.
+            mod_category_id (int, optional): The id of the moderator category. Defaults to None.
+            last_mod_check (int, optional): Unix timestamp of last time the moderators were checked. Defaults to None.
+            time_between_checks (int, optional): Amount of seconds we should wait between checking the moderators. Defaults to None.
         """
+
         guild_add_query = """
         INSERT INTO
-            config(guild_id)
+            config(guild_id, default_quotas, mod_category_id, last_mod_check, time_between_checks)
         VALUES
-            (?);
+            (?, ?, ?, ?, ?);
         """
-        self._execute_query(guild_add_query, (guild_id,))
+        self._execute_query(guild_add_query, (guild_id, "".join(map(
+            str, default_quotas)), mod_category_id, last_mod_check, time_between_checks,))
 
     def set_mod_category_id(self, guild_id: int, mod_category_id: int) -> None:
         """Sets the mod category ID in the given guild to the given value.
@@ -656,7 +739,7 @@ class DBHandler():
         """Sets time_between_checks in the given guild to the given value.
 
         Args:
-            guild_id (int): The id of the guild to update the value in.
+            guild_id (int): The id of the guild to update the values in.
             time_between_checks (int): The new value.
         """
         time_between_checks_edit_query = """
@@ -669,7 +752,33 @@ class DBHandler():
         self._execute_query(time_between_checks_edit_query,
                             (time_between_checks, guild_id,))
 
+    def set_default_quotas(self, guild_id: int,
+                           default_quotas: tuple[int, int, int]) -> None:
+        """Sets the default quota for new moderators.
+
+        Args:
+            guild_id (int): The id of the guild to update the value for.
+            default_quotas (tuple): The new values.
+        """
+        default_quotas_edit_query = """
+        UPDATE config
+        SET
+            default_quotas = ?
+        WHERE
+            guild_id = ?
+        """
+        self._execute_query(default_quotas_edit_query,
+                            ("".join(map(str, default_quotas)), guild_id,))
+
     def get_guild(self, guild_id: int) -> Guild:
+        """Gets a guild given it's id.
+
+        Args:
+            guild_id (int): Discord id of the guild to get.
+
+        Returns:
+            Guild: A Guild option with all the config info from the guild.
+        """
         guild_get_query = """
         SELECT * FROM config
         WHERE
@@ -680,7 +789,12 @@ class DBHandler():
             return Guild(*result)
         return None
 
-    def get_all_guilds(self) -> List[Guild]:
+    def get_all_guilds(self) -> list[Guild]:
+        """Gets all guilds in the object's database.
+
+        Returns:
+            list[Guild]: A list of all guilds in the database as Guild objects.
+        """
         guild_get_query = """
         SELECT * FROM config
         """
@@ -717,7 +831,7 @@ if __name__ == "__main__":
     action_table_query = """
     CREATE TABLE IF NOT EXISTS actions (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-        "type" STRING NOT NULL,
+        "type" TEXT NOT NULL,
         "message_id" INTEGER,
         "channel_id" INTEGER NOT NULL,
         "mod_id" INTEGER REFERENCES moderators NOT NULL,
@@ -728,7 +842,7 @@ if __name__ == "__main__":
 
     vacation_table_query = """
     CREATE TABLE IF NOT EXISTS vacation_weeks (
-        "date" STRING UNIQUE NOT NULL,
+        "date" TEXT UNIQUE NOT NULL,
         "mod_id" INTEGER REFERENCES moderators NOT NULL
     )"""
     DB._execute_query(vacation_table_query)
@@ -738,6 +852,7 @@ if __name__ == "__main__":
         "guild_id" INTEGER PRIMARY KEY,
         "mod_category_id" INTEGER,
         "last_mod_check" INTEGER,
-        "time_between_checks" INTEGER
+        "time_between_checks" INTEGER,
+        "default_quotas" TEXT NOT NULL
     );"""
     DB._execute_query(config_table_query)
