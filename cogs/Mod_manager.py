@@ -166,6 +166,9 @@ class ModManager(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:
+        # Check to make sure author isn't the bot itself.
+        if msg.author == self.bot.user:
+            return
         # Make sure message is by moderator and not in moderator chats.
         guild = self.db.get_guild(msg.guild.id)
         if not guild:
@@ -177,6 +180,9 @@ class ModManager(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
+        # Check to make sure author isn't the bot itself.
+        if before.author == self.bot.user:
+            pass
         # Make sure message is by moderator and not in moderator chats.
         guild = self.db.get_guild(after.guild.id)
         if not guild:
@@ -257,8 +263,17 @@ class ModManager(commands.Cog):
             await interaction.response.send_message(f"{user.display_name} is not a moderator", ephemeral=True)
 
     async def set_quotas(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        """Command to set the quotas of a given moderator.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+            user (discord.Member): The user who the command should run on, is also passed automatically.
+        """
+        # TODO; Make embed
         mod = self.db.get_moderator(user.id)
-        # ! TODO; MAKE A MODAL TO DEAL WITH THIS I JUST CAN'T BE BOTHERED TONIGHT
+        if not mod:
+            await interaction.response.send_message(f"User {user.display_name} is not a moderator.")
+        await interaction.response.send_modal(SetUserQuotaModal(user, self))
 
     async def get_quotas(self, interaction: discord.Interaction, user: discord.Member) -> None:
         # TODO; Make this an embed
@@ -324,6 +339,58 @@ class ModManager(commands.Cog):
         """
         return channel.category.id == self.db.get_guild(
             channel.guild.id,).mod_category_id
+
+
+class SetUserQuotaModal(discord.ui.Modal):
+    """Modal to set the quotas for a certain user."""
+
+    def __init__(self, user: discord.Member, cog: ModManager) -> None:
+        super().__init__(title=f"Editing quotas for {user.display_name}")
+        self.user = user
+        self.db = cog.db
+
+        # Setting the default values to be the moderator's current quota.
+        moderator = cog.db.get_moderator(user.id)
+        
+        self.sent_messages.default = str(moderator.send_quota)
+        self.edited_messages.default = str(moderator.edit_quota)
+        self.deleted_messages.default = str(moderator.delete_quota)
+
+
+
+    # The default is replaced with runtime values
+    # in the init fucntion.
+    sent_messages = discord.ui.TextInput(
+        style = discord.TextStyle.short,
+        label = "Sent message quota: ",
+        default = ""
+    )
+
+    edited_messages = discord.ui.TextInput(
+        style=discord.TextStyle.short,
+        label= "Edited message quota: ",
+        default = ""
+    )
+
+    deleted_messages = discord.ui.TextInput(
+        style = discord.TextStyle.short,
+        label = "Deleted message quota: ",
+        default = ""
+    )
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            quotas = (self.sent_messages.value, self.edited_messages.value, self.deleted_messages.value,)
+            self.db.set_quota(self.user.id, quotas)
+            await interaction.response.send_message(f"Updated quotas for {self.user.display_name} to be: sent: {quotas[0]}, edited: {quotas[1]}, deleted: {quotas[2]}", ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message(f"one of the following is not a number: {self.sent_messages.value}, {self.edited_messages.value}, {self.deleted_messages.value}", ephemeral=True)
+    
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await interaction.response.send_message("something went wrong, please try again", ephemeral=True)
+        # The super of this function logs our error with the setup logging methods.
+        return await super().on_error(interaction, error)
+
 
 
 # ------------------------------MAIN CODE------------------------------
