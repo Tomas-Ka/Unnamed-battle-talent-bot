@@ -108,14 +108,15 @@ class ConfigView(discord.ui.View):
         embed = discord.Embed(
             title="Config",
             description="Config set! Please make sure to update your quotas using the ``/set_quotas command``!:",
-            color=colour)
+            colour=colour)
         embed.add_field(
             name="Moderator category:",
             value=self.mod_category_name,
             inline=False)
 
         if self.roles:
-            # Can't put a \n in an fstring without python 3.12, and so we spin it out into a var here.
+            # Can't put a \n in an fstring without python 3.12, and so we spin
+            # it out into a var here.
             names = '\n'.join([role.name for role in self.roles])
             embed.add_field(
                 name="Registered admins:",
@@ -258,7 +259,7 @@ class ModManager(commands.Cog):
         embed = discord.Embed(
             title="Moderator list",
             description="Here are all the moderators and how many messages they've sent:",
-            color=discord.Color.from_str("#ffffff"))
+            colour=discord.Colour.from_str("#ffffff"))
         # Add new field to the embed for every moderator.
         for id in [mod.id for mod in self.db.get_all_moderators()]:
             sent, edited, deleted = self.db.get_amount_of_actions_by_type(
@@ -281,8 +282,19 @@ class ModManager(commands.Cog):
         embed = discord.Embed(
             title="Config",
             description="Please fill in the dropdowns at the bottom of this message (and hit the button) to get this bot set up and running on your server. Once you have finished this, please make sure to set a quota for your moderators by running ``/set_quota``!",
-            color=colour)
+            colour=colour)
         await interaction.response.send_message(view=ConfigView(self.db), embed=embed)
+
+    @app_commands.command(description="Set default server quotas")
+    async def set_quotas(self, interaction: discord.Interaction, send_quota: int, edit_quota: int, delete_quota: int) -> None:
+        self.db.set_default_quotas(
+            interaction.guild_id, (send_quota, edit_quota, delete_quota,))
+        embed = discord.Embed(
+            title="Set quotas",
+            description=f"The default quota that the moderators need to fufill every week is:\n``{send_quota} sent messages, {edit_quota} edited messages & {delete_quota} deleted messages``\n### Please not that this command has **not** updated any quotas for current moderators",
+            colour=colour)
+
+        await interaction.response.send_message(embed=embed)
 
     def is_moderator_channel(self, channel: discord.abc.GuildChannel) -> bool:
         """Function that checks if the given channel is under the moderator category in it's server.
