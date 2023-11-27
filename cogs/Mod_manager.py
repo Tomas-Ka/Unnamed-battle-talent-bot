@@ -107,28 +107,33 @@ class ConfigView(discord.ui.View):
         # Create embed to update the message with.
         embed = discord.Embed(
             title="Config",
-            description="Config set! Please make sure to update your quotas using the ``/set_quotas command!``",
+            description="Config set! Please make sure to update your quotas using the ``/set_quotas command``!:",
             color=colour)
         embed.add_field(
-            name="Moderator category",
+            name="Moderator category:",
             value=self.mod_category_name,
             inline=False)
 
         if self.roles:
-            # Can't put a \n in an fstring without python 3.12, and so we spin it out here.
-            # The [:-2] at the end is to remove the final \n from the back of
-            # the list.
-            names = '\n'.join([role.name for role in self.roles])[:-2]
+            # Can't put a \n in an fstring without python 3.12, and so we spin it out into a var here.
+            names = '\n'.join([role.name for role in self.roles])
             embed.add_field(
-                name="Registered admins",
-                value=f"You have registered the following roles as admins:\n{names}")
+                name="Registered admins:",
+                value=f"You have registered the following roles as admins:\n{names}",
+                inline=False)
         else:
             embed.add_field(
-                name="Registered admins",
-                value="You have not registered any roles as admin.")
+                name="Registered admins:",
+                value="You have not registered any roles as admin.",
+                inline=False)
+
+        embed.add_field(
+            name="Moderator checks:",
+            value=f"Moderator checks will be done every {self.wait_time} days",
+            inline=False)
 
         # Update the embed in the sent message.
-        await interaction.response.edit_message(view=self, embed=embed)
+        await interaction.response.edit_message(view=None, embed=embed)
         self.stop()
 
 
