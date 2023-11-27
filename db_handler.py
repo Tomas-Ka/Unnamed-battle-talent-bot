@@ -768,7 +768,7 @@ class DBHandler():
             guild_id = ?
         """
         self._execute_query(default_quotas_edit_query,
-                            ("".join(map(str, default_quotas)), guild_id,))
+                            (",".join(map(str, default_quotas)), guild_id,))
 
     def get_guild(self, guild_id: int) -> Guild:
         """Gets a guild given it's id.

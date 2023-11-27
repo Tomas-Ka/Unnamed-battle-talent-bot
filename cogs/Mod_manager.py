@@ -107,7 +107,7 @@ class ConfigView(discord.ui.View):
         # Create embed to update the message with.
         embed = discord.Embed(
             title="Config",
-            description="Config set! Please make sure to update your quotas using the ``/set_quotas command``!:",
+            description="Config set! Please make sure to update your quotas using the ``/config_set_quotas command``!:",
             colour=colour)
         embed.add_field(
             name="Moderator category:",
@@ -286,12 +286,12 @@ class ModManager(commands.Cog):
         await interaction.response.send_message(view=ConfigView(self.db), embed=embed)
 
     @app_commands.command(description="Set default server quotas")
-    async def set_quotas(self, interaction: discord.Interaction, send_quota: int, edit_quota: int, delete_quota: int) -> None:
+    async def config_set_quotas(self, interaction: discord.Interaction, send_quota: int, edit_quota: int, delete_quota: int) -> None:
         self.db.set_default_quotas(
             interaction.guild_id, (send_quota, edit_quota, delete_quota,))
         embed = discord.Embed(
             title="Set quotas",
-            description=f"The default quota that the moderators need to fufill every week is:\n``{send_quota} sent messages, {edit_quota} edited messages & {delete_quota} deleted messages``\n### Please not that this command has **not** updated any quotas for current moderators",
+            description=f"The default quota that the moderators need to fufill every week is:\n``{send_quota} sent messages, {edit_quota} edited messages & {delete_quota} deleted messages``\n### Please note that this command has **not** updated any quotas for current moderators",
             colour=colour)
 
         await interaction.response.send_message(embed=embed)
