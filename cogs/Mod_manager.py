@@ -10,8 +10,10 @@ import time
 global colour
 colour = 0x1dff1a
 
+
 class ConfigView(discord.ui.View):
     """View for the config message."""
+
     def __init__(self, db: DBHandler) -> None:
         super().__init__()
         self.mod_category_id = 0
@@ -43,13 +45,23 @@ class ConfigView(discord.ui.View):
         # when we initialize the bot for a new server/guild
         self.roles = select.values
         await interaction.response.defer()
-    
-    @discord.ui.select(cls=discord.ui.Select,
-                       options=[
-                           discord.SelectOption(label="1 week", description="check moderator stats once every week", value="7"),
-                           discord.SelectOption(label="2 weeks", description="check moderator stats once every other week", value="14"),
-                           discord.SelectOption(label="4 weeks", description="check moderator stats once every 4 weeks", value="28")
-                       ], placeholder="Select how much time we should wait between moderator checks")
+
+    @discord.ui.select(
+        cls=discord.ui.Select,
+        options=[
+            discord.SelectOption(
+                label="1 week",
+                description="check moderator stats once every week",
+                value="7"),
+            discord.SelectOption(
+                label="2 weeks",
+                description="check moderator stats once every other week",
+                value="14"),
+            discord.SelectOption(
+                label="4 weeks",
+                description="check moderator stats once every 4 weeks",
+                value="28")],
+        placeholder="Select how much time we should wait between moderator checks")
     async def wait_time_select(self, interaction: discord.Interaction, select: discord.ui.Select) -> None:
         # Lets the user select one of the predetermined valeus from the dropdown.
         # This setting can also be changed later with a slash command
@@ -66,8 +78,9 @@ class ConfigView(discord.ui.View):
             await interaction.response.send_message("You have to select a default wait time!", ephemeral=True)
             return
 
-        # Get amount of seconds to wait by taking about of days * amount of seconds in a day.
-        wait_time = int(self.wait_time) * 86,400
+        # Get amount of seconds to wait by taking about of days * amount of
+        # seconds in a day.
+        wait_time = int(self.wait_time) * 86_400
 
         guild = self.db.get_guild(interaction.guild_id)
         if not guild:
@@ -77,7 +90,8 @@ class ConfigView(discord.ui.View):
                               wait_time,)
             guild = self.db.get_guild(interaction.guild_id)
 
-        # Register all users who have the selected roles as moderators in the database.
+        # Register all users who have the selected roles as moderators in the
+        # database.
         for role in self.roles:
             for member in role.members:
                 if member.id not in [
@@ -91,17 +105,28 @@ class ConfigView(discord.ui.View):
         self.wait_time_select.disabled = True
 
         # Create embed to update the message with.
-        embed = discord.Embed(title="Config", description="Config set! Please make sure to update your quotas using the ``/set_quotas command!``", color=colour)
-        embed.add_field(name="Moderator category", value=self.mod_category_name, inline=False)
+        embed = discord.Embed(
+            title="Config",
+            description="Config set! Please make sure to update your quotas using the ``/set_quotas command!``",
+            color=colour)
+        embed.add_field(
+            name="Moderator category",
+            value=self.mod_category_name,
+            inline=False)
 
         if self.roles:
             # Can't put a \n in an fstring without python 3.12, and so we spin it out here.
-            # The [:-2] at the end is to remove the final \n from the back of the list.
+            # The [:-2] at the end is to remove the final \n from the back of
+            # the list.
             names = '\n'.join([role.name for role in self.roles])[:-2]
-            embed.add_field(name="Registered admins", value=f"You have registered the following roles as admins:\n{names}")
+            embed.add_field(
+                name="Registered admins",
+                value=f"You have registered the following roles as admins:\n{names}")
         else:
-            embed.add_field(name="Registered admins", value="You have not registered any roles as admin.")
-        
+            embed.add_field(
+                name="Registered admins",
+                value="You have not registered any roles as admin.")
+
         # Update the embed in the sent message.
         await interaction.response.edit_message(view=self, embed=embed)
         self.stop()
@@ -180,7 +205,7 @@ class ModManager(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             user (discord.Member): The user who the command should run on, is also passed automatically.
         """
-        # TODO; Make this an embed 
+        # TODO; Make this an embed
         if user.id not in [mod.id for mod in self.db.get_all_moderators()]:
             guild = self.db.get_guild(interaction.guild_id)
             self.db.register_moderator(user.id, guild.default_quotas)
@@ -240,7 +265,7 @@ class ModManager(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(description="Configures the bot")    
+    @app_commands.command(description="Configures the bot")
     async def configure(self, interaction: discord.Interaction) -> None:
         """Slash command that configures a bot, adds it to the database and makes sure
         it has all the default settings it requires
@@ -248,7 +273,10 @@ class ModManager(commands.Cog):
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
-        embed=discord.Embed(title="Config", description="Please fill in the dropdowns at the bottom of this message (and hit the button) to get this bot set up and running on your server. Once you have finished this, please make sure to set a quota for your moderators by running ``/set_quota``!", color=colour)
+        embed = discord.Embed(
+            title="Config",
+            description="Please fill in the dropdowns at the bottom of this message (and hit the button) to get this bot set up and running on your server. Once you have finished this, please make sure to set a quota for your moderators by running ``/set_quota``!",
+            color=colour)
         await interaction.response.send_message(view=ConfigView(self.db), embed=embed)
 
     def is_moderator_channel(self, channel: discord.abc.GuildChannel) -> bool:
