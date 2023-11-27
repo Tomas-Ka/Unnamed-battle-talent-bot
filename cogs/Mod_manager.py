@@ -152,9 +152,17 @@ class ModManager(commands.Cog):
         self.ctx_get_moderator = app_commands.ContextMenu(
             name="Get moderator stats", callback=self.get_moderator)
 
+        self.ctx_set_quotas = app_commands.ContextMenu(
+            name="Set quotas", callback=self.set_quotas)
+        self.ctx_get_quotas = app_commands.ContextMenu(
+            name="Get quotas", callback=self.get_quotas)
+
         self.bot.tree.add_command(self.ctx_register_moderator)
         self.bot.tree.add_command(self.ctx_deregister_moderator)
         self.bot.tree.add_command(self.ctx_get_moderator)
+
+        self.bot.tree.add_command(self.ctx_set_quotas)
+        self.bot.tree.add_command(self.ctx_get_quotas)
 
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:
@@ -247,6 +255,15 @@ class ModManager(commands.Cog):
             await interaction.response.send_message(f"moderator {user.display_name} has sent {sent} messages, edited {edited} messages and deleted {deleted} messages.", ephemeral=True)
         else:
             await interaction.response.send_message(f"{user.display_name} is not a moderator", ephemeral=True)
+
+    async def set_quotas(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        mod = self.db.get_moderator(user.id)
+        # ! TODO; MAKE A MODAL TO DEAL WITH THIS I JUST CAN'T BE BOTHERED TONIGHT
+
+    async def get_quotas(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        # TODO; Make this an embed
+        mod = self.db.get_moderator(user.id)
+        await interaction.response.send_message(f"User {user.display_name} has the following quotas:\n``{mod.send_quota} sent messages, {mod.edit_quota} edited messages & {mod.delete_quota} deleted messages``", ephemeral=True)
 
     @app_commands.command(description="Sends the current moderator list as an embed")
     async def list_moderators(self, interaction: discord.Interaction) -> None:
