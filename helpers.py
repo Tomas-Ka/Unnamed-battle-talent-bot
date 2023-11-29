@@ -82,15 +82,19 @@ class Moderator:
 
 
 class StickyMessage:
-    def __init__(self, channel_id: int, message_id: int):
+    def __init__(self, channel_id: int, message_id: int, title: str, description: str):
         """Represents a sticky message object.
 
         Args:
             channel_id (int): Discord id of the channel with the message.
             message_id (int): Discord id of the message sent.
+            title (str): The title of the embed message.
+            description (str): The descrition of the embed message.
         """
         self.message_id = message_id
         self.channel_id = channel_id
+        self.title = title
+        self.description = description
 
 
 class VacationWeek:

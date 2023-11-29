@@ -74,20 +74,22 @@ class DBHandler():
 # -------------------------- STICKY HANDLING --------------------------
 
 
-    def create_sticky(self, channel_id: int, message_id: int) -> None:
+    def create_sticky(self, channel_id: int, message_id: int, title: str, description: str) -> None:
         """Adds a new sticky to the object's database.
 
         Args:
             channel_id (int): The discord Channel id of the message.
             message_id (int): The id of the message itself.
+            title (str): The title of the embed message.
+            description (str): The descrition of the embed message.
         """
         sticky_add_query = """
         INSERT INTO
-            stickies (channel_id, message_id)
+            stickies (channel_id, message_id, title, description)
         VALUES
-            (?, ?);
+            (?, ?, ?, ?);
         """
-        self._execute_query(sticky_add_query, (channel_id, message_id,))
+        self._execute_query(sticky_add_query, (channel_id, message_id, title, description))
 
     def update_sticky(self, channel_id: int, message_id: int) -> None:
         """Updates the DB entry for a given channel to point to another
@@ -810,7 +812,9 @@ if __name__ == "__main__":
     stickies_table_query = """
     CREATE TABLE IF NOT EXISTS stickies (
         "channel_id" INTEGER PRIMARY KEY,
-        "message_id" INTEGER UNIQUE NOT NULL
+        "message_id" INTEGER UNIQUE NOT NULL,
+        "title" TEXT NOT NULL,
+        "description" TEXT NOT NULL
     );
     """
     DB._execute_query(stickies_table_query)

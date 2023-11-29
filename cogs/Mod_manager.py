@@ -6,7 +6,7 @@ from db_handler import DBHandler
 from helpers import Action, Moderator, Guild, VacationWeek
 import time
 
-# ? global colour for the bot. Change this when we get around to a cohesive theme and whatnot.
+# ? global colour for the cog. Change this when we get around to a cohesive theme and whatnot.
 global colour
 colour = 0x1dff1a
 
