@@ -505,11 +505,13 @@ class DBHandler():
         return (
             len(
                 self.get_all_actions_of_type(
-                    start_time, end_time, moderator_id, "sent")), len(
+                    start_time, end_time, moderator_id, "sent")),
+            len(
                 self.get_all_actions_of_type(
-                    start_time, end_time, moderator_id, "edited")), len(
-                        self.get_all_actions_of_type(
-                            start_time, end_time, moderator_id, "deleted")))
+                    start_time, end_time, moderator_id, "edited")),
+            len(
+                self.get_all_actions_of_type(
+                    start_time, end_time, moderator_id, "deleted")))
 
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
