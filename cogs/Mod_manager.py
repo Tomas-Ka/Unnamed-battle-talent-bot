@@ -82,12 +82,16 @@ class ConfigView(discord.ui.View):
         # seconds in a day.
         wait_time = int(self.wait_time) * 86_400
 
+        # Setting up the member count voice channel.
+        count = interaction.guild.member_count
+        member_count_channel = await interaction.guild.create_voice_channel(f"members-{count}", reason="Setting up bot, creating channel for tracking member count", position=0, overwrites={interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=False)})
+
         guild = self.db.get_guild(interaction.guild_id)
         if not guild:
             # Set some initial config stuff from the values we just recieved.
             self.db.add_guild(interaction.guild_id, (0, 0, 0),
                               self.mod_category_id, time.time(),
-                              wait_time,)
+                              wait_time, member_count_channel.id)
             guild = self.db.get_guild(interaction.guild_id)
 
         # Register all users who have the selected roles as moderators in the
@@ -270,6 +274,7 @@ class ModManager(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    # TODO! Maybe spin this out into it's own cog
     @app_commands.command(description="Configures the bot")
     async def configure(self, interaction: discord.Interaction) -> None:
         """Slash command that configures a bot, adds it to the database and makes sure
