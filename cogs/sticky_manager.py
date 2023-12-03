@@ -43,7 +43,6 @@ class StickyManager(commands.Cog):
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
-        # TODO; Make embeeeeds
         if self.db.get_sticky(interaction.channel_id):
             await interaction.response.send_message("There is already a sticky in this channel.", ephemeral=True)
             return
@@ -110,15 +109,15 @@ class CreateStickyModal(discord.ui.Modal):
             self.description.value)
 
         # Tell discord we're done here.
-        interaction.response.defer()
+        await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
         # The super of this function logs our error with the setup logging
         # methods.
-        return await super().on_error(interaction, error)
+        await super().on_error(interaction, error)
 
 
 async def setup(bot: commands.Bot) -> None:
-    print(f"\tcogs.Mod_manager begin loading")
+    print(f"\tcogs.sticky_manager begin loading")
     await bot.add_cog(StickyManager(bot))
