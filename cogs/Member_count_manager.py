@@ -47,15 +47,14 @@ class MemberCountManager(commands.Cog):
             channel = self.bot.get_guild(
                 guild.id).get_channel(
                 guild.member_count_channel_id)
-            self.db.set_mod_category_id(guild.id, None)
+            self.db.set_member_count_channel_id(guild.id, None)
             if channel:
-                channel.delete(
-                    f"Deleted through command by {interaction.user.display_name}")
-                await interaction.response.send_message("Successfuly deleted the member count channel", ephemeral=True)
+                await channel.delete()
+                await interaction.response.send_message("Successfuly deleted the member count channel.", ephemeral=True)
                 return
-            await interaction.response.send_message("Could not find channel, but deleted database entry", ephemeral=True)
+            await interaction.response.send_message("Could not find channel, but deleted database entry.", ephemeral=True)
             return
-        await interaction.response.send_message("No member count channel registered for this guild.\nPlease create one with /create_member_count_channel", ephemeral=True)
+        await interaction.response.send_message("Server is not set up with this bot yet.\nPlease run /configure to do so.", ephemeral=True)
 
     @app_commands.command()
     async def create_member_count_channel(self, interaction: discord.Interaction):
@@ -66,20 +65,20 @@ class MemberCountManager(commands.Cog):
         """
         # Check to make sure there isn't already a channel.
         guild = self.db.get_guild(interaction.guild_id)
-        if not interaction.guild.get_channel(guild.member_count_channel_id):
+        if interaction.guild.get_channel(guild.member_count_channel_id):
             await interaction.response.send_message("There is already a member count channel!", ephemeral=True)
             return
 
         # Setting up a new member count voice channel.
         count = interaction.guild.member_count
-        member_count_channel = await interaction.guild.create_voice_channel(f"members-{count}",
+        member_count_channel = await interaction.guild.create_voice_channel(f"members - {count}",
                                                                             reason="Setting up bot, creating channel for tracking member count",
                                                                             position=0,
                                                                             overwrites={
                                                                                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=False)
                                                                             }
                                                                             )
-        self.db.set_mod_category_id(
+        self.db.set_member_count_channel_id(
             interaction.guild_id,
             member_count_channel.id)
         await interaction.response.send_message("Member count channel created!", ephemeral=True)

@@ -73,7 +73,6 @@ class DBHandler():
 
 # -------------------------- STICKY HANDLING --------------------------
 
-
     def create_sticky(
             self,
             channel_id: int,
@@ -526,7 +525,6 @@ class DBHandler():
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
 
-
     def add_vacation_week(self, moderator_id: int, date: str) -> None:
         """Adds a new action to the object's database.
 
@@ -682,7 +680,6 @@ class DBHandler():
 
 # -------------------------- CONFIG HANDLING --------------------------
 
-
     def add_guild(self,
                   guild_id: int,
                   default_quotas: tuple[int,
@@ -715,7 +712,7 @@ class DBHandler():
                                 last_mod_check,
                                 time_between_checks,
                                 member_count_channel_id,
-                            ))
+                             ))
 
     def set_mod_category_id(self, guild_id: int, mod_category_id: int) -> None:
         """Sets the mod category ID in the given guild to the given value.
@@ -788,6 +785,20 @@ class DBHandler():
         """
         self._execute_query(default_quotas_edit_query,
                             ("".join(map(str, default_quotas)), guild_id,))
+
+    def set_member_count_channel_id(
+            self,
+            guild_id: int,
+            member_count_channel_id: int | None) -> None:
+        member_count_channel_id_edit_query = """
+        UPDATE config
+        SET
+            member_count_channel_id = ?
+        WHERE
+            guild_id = ?
+        """
+        self._execute_query(member_count_channel_id_edit_query,
+                            (member_count_channel_id, guild_id,))
 
     def get_guild(self, guild_id: int) -> Guild:
         """Gets a guild given it's id.
