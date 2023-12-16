@@ -516,11 +516,13 @@ class DBHandler():
         return (
             len(
                 self.get_all_actions_of_type(
-                    start_time, end_time, moderator_id, "sent")), len(
+                    start_time, end_time, moderator_id, "sent")),
+            len(
                 self.get_all_actions_of_type(
-                    start_time, end_time, moderator_id, "edited")), len(
-                        self.get_all_actions_of_type(
-                            start_time, end_time, moderator_id, "deleted")))
+                    start_time, end_time, moderator_id, "edited")),
+            len(
+                self.get_all_actions_of_type(
+                    start_time, end_time, moderator_id, "deleted")))
 
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
@@ -784,7 +786,7 @@ class DBHandler():
             guild_id = ?
         """
         self._execute_query(default_quotas_edit_query,
-                            ("".join(map(str, default_quotas)), guild_id,))
+                            (",".join(map(str, default_quotas)), guild_id,))
 
     def set_member_count_channel_id(
             self,

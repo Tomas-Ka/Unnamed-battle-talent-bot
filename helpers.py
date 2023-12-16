@@ -148,7 +148,7 @@ class Guild:
         """
 
         if isinstance(default_quotas, str):
-            default_quotas = tuple([i for i in default_quotas])
+            default_quotas = tuple(default_quotas.split(","))
 
         self.id = guild_id
         self.mod_category_id = mod_category_id
