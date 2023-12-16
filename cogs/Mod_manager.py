@@ -320,13 +320,17 @@ class ModManager(commands.Cog):
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
+        moderators = self.db.get_all_moderators()
+        if not moderators:
+            await interaction.response.send_message(embed = discord.Embed(title="Moderator list", description="There are no moderators in this server", color=discord.Color.from_str("#ffffff")))
+            return
         # Create embed object.
         embed = discord.Embed(
             title="Moderator list",
             description="Here are all the moderators and how many messages they've sent:",
             colour=discord.Colour.from_str("#ffffff"))
         # Add new field to the embed for every moderator.
-        for id in [mod.id for mod in self.db.get_all_moderators()]:
+        for id in [mod.id for mod in moderators]:
             sent, edited, deleted = self.db.get_amount_of_actions_by_type(
                 0, int(time.time()), id)
             embed.add_field(
