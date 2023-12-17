@@ -6,19 +6,20 @@ class Action:
             self,
             id: int,
             type: str,
+            message_id: int | None,
             channel_id: int,
             mod_id: int,
             timestamp: int,
-            message_id: int = None):
+            guild_id: int,):
         """Represents an action.
 
         Args:
             id (int): Database id.
             type (str): Type of action, "sent", "edited", or "deleted".
+            message_id (int | None): Id of the message the action is referencing. Should be set to None when type is "deleted".
             channel_id (int): Id of the discord channel the action occured in.
             mod_id (int): Id of the moderator that executed the action.
             timestamp (int): Unix timestamp of when the action was executed.
-            message_id (int, optional): Id of the message the action is referencing (does not exist when action is "deleted"). Defaults to None.
         """
         self.id = id
         if type.lower() not in ["sent", "edited", "deleted"]:
@@ -29,6 +30,7 @@ class Action:
         self.mod_id = mod_id
         self.timestamp = timestamp
         self.message_id = message_id
+        self.guild_id = guild_id
 
 
 class Moderator:
@@ -40,7 +42,8 @@ class Moderator:
             delete_quota: int,
             consecutive_completed_weeks: int,
             vacation_days: int,
-            active: int) -> None:
+            active: int,
+            guild_id: int) -> None:
         """Represents a moderator.
 
         Args:
@@ -59,6 +62,7 @@ class Moderator:
         self.consecutive_completed_weeks = consecutive_completed_weeks
         self.vacation_days = vacation_days
         self.active = active
+        self.guild_id = guild_id
 
     @property
     def quotas(self) -> tuple[int, int, int]:
@@ -82,7 +86,12 @@ class Moderator:
 
 
 class StickyMessage:
-    def __init__(self, channel_id: int, message_id: int, title: str, description: str):
+    def __init__(
+            self,
+            channel_id: int,
+            message_id: int,
+            title: str,
+            description: str):
         """Represents a sticky message object.
 
         Args:
@@ -98,7 +107,7 @@ class StickyMessage:
 
 
 class VacationWeek:
-    def __init__(self, date: str, mod_id: int) -> None:
+    def __init__(self, date: str, mod_id: int, guild_id: int) -> None:
         """Represents a vaction week.
 
         Args:
@@ -107,6 +116,7 @@ class VacationWeek:
         """
         self.date = date
         self.mod_id = mod_id
+        self.guild_id = guild_id
 
     @property
     def dateobj(self) -> date:
