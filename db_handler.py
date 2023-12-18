@@ -912,7 +912,8 @@ class DBHandler():
                   mod_category_id: int = None,
                   last_mod_check: int = None,
                   time_between_checks: int = None,
-                  member_count_channel_id: int = None) -> None:
+                  member_count_channel_id: int = None,
+                  output_channel_id: int = None) -> None:
         """Creates a new entry for the given guild in the database.
 
         Args:
@@ -921,13 +922,15 @@ class DBHandler():
             mod_category_id (int, optional): The id of the moderator category. Defaults to None.
             last_mod_check (int, optional): Unix timestamp of last time the moderators were checked. Defaults to None.
             time_between_checks (int, optional): Amount of seconds we should wait between checking the moderators. Defaults to None.
+            member_count_channel_id (int, optional): The id of the created membercount channel. Defaults to None.
+            output_channel_id (int, optional): The id of the channel to output any stats to. Defaults to None.
         """
 
         guild_add_query = """
         INSERT INTO
-            config(guild_id, default_quotas, mod_category_id, last_mod_check, time_between_checks, member_count_channel_id)
+            config(guild_id, default_quotas, mod_category_id, last_mod_check, time_between_checks, member_count_channel_id, output_channel_id)
         VALUES
-            (?, ?, ?, ?, ?, ?);
+            (?, ?, ?, ?, ?, ?, ?);
         """
         self._execute_query(guild_add_query,
                             (guild_id,
@@ -936,6 +939,7 @@ class DBHandler():
                                 last_mod_check,
                                 time_between_checks,
                                 member_count_channel_id,
+                                output_channel_id,
                              ))
 
     def set_mod_category_id(self, guild_id: int, mod_category_id: int) -> None:
@@ -1014,6 +1018,12 @@ class DBHandler():
             self,
             guild_id: int,
             member_count_channel_id: int | None) -> None:
+        """Sets the member count channel id for the given guild.
+
+        Args:
+            guild_id (int): The id of the guild to update the value for.
+            member_count_channel_id (int | None): The new value.
+        """
         member_count_channel_id_edit_query = """
         UPDATE config
         SET
@@ -1023,6 +1033,26 @@ class DBHandler():
         """
         self._execute_query(member_count_channel_id_edit_query,
                             (member_count_channel_id, guild_id,))
+    
+    def set_output_channel_id(
+            self,
+            guild_id: int,
+            output_channel_id: int | None) -> None:
+        """Sets the channel to output any data to for the given guild.
+
+        Args:
+            guild_id (int): The id of the guild to update the value for.
+            output_channel_id (int | None): The new value.
+        """        
+        output_channel_id_edit_query = """
+        UPDATE config
+        SET
+            output_channel_id = ?
+        WHERE
+            guild_id = ?
+        """
+        self._execute_query(output_channel_id_edit_query,
+                            (output_channel_id, guild_id,))
 
     def get_guild(self, guild_id: int) -> Guild:
         """Gets a guild given it's id.
@@ -1114,7 +1144,8 @@ if __name__ == "__main__":
         "last_mod_check" INTEGER,
         "time_between_checks" INTEGER,
         "default_quotas" TEXT NOT NULL,
-        "member_count_channel_id" INTEGER
+        "member_count_channel_id" INTEGER,
+        "output_channel_id" INTEGER
     );
     """
     DB._execute_query(config_table_query)

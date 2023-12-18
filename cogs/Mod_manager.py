@@ -17,7 +17,9 @@ class ConfigView(discord.ui.View):
     def __init__(self, db: DBHandler) -> None:
         super().__init__()
         self.mod_category_id = 0
+        self.output_channel_id = 0
         self.mod_category_name = "Null"
+        self.output_channel_name = "Null"
         self.roles = []
         self.wait_time = None
         self.db = db
@@ -25,13 +27,25 @@ class ConfigView(discord.ui.View):
     @discord.ui.select(cls=discord.ui.ChannelSelect,
                        channel_types=[discord.ChannelType.category],
                        placeholder="Select moderator category")
-    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
+    async def channel_category_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
         # Lets the user select a channel category from a dropdown.
         # This function is run every time they change the dropdown.
         # The channel select chooses what category we don't track messages in
         # when we initialize the bot for a new server/guild.
         self.mod_category_id = select.values[0].id
         self.mod_category_name = select.values[0].name
+        await interaction.response.defer()
+    
+    @discord.ui.select(cls=discord.ui.ChannelSelect,
+                       channel_types=[discord.ChannelType.text],
+                       placeholder="Select log output chat")
+    async def log_output_chat(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
+        # Lets the user select a channel from a dropdown.
+        # This function is run every time they change the dropdown.
+        # The log output select chooses what channel we send our outputs in
+        # when we initialize the bot for a new server/guild.
+        self.output_channel_id = select.values[0].id
+        self.output_channel_name = select.values[0].name
         await interaction.response.defer()
 
     @discord.ui.select(cls=discord.ui.RoleSelect,
@@ -72,7 +86,10 @@ class ConfigView(discord.ui.View):
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         # Make sure all our fields have proper values and error if not
         if (self.mod_category_id == 0):
-            await interaction.response.send_message("You have to select a category!", ephemeral=True)
+            await interaction.response.send_message("You have to select a moderator category!", ephemeral=True)
+            return
+        if (self.output_channel_id == 0):
+            await interaction.response.send_message("You have to select an output channel!", ephemeral=True)
             return
         if not self.wait_time:
             await interaction.response.send_message("You have to select a default wait time!", ephemeral=True)
@@ -91,7 +108,8 @@ class ConfigView(discord.ui.View):
             # Set some initial config stuff from the values we just recieved.
             self.db.add_guild(interaction.guild_id, (0, 0, 0),
                               self.mod_category_id, time.time(),
-                              wait_time, member_count_channel.id)
+                              wait_time, member_count_channel.id,
+                              self.output_channel_id)
             guild = self.db.get_guild(interaction.guild_id)
 
         # Register all users who have the selected roles as moderators in the
@@ -105,7 +123,8 @@ class ConfigView(discord.ui.View):
 
         # Disable all the now used dropdowns (as well as the button).
         self.confirm.disabled = True
-        self.channel_select.disabled = True
+        self.channel_category_select.disabled = True
+        self.log_output_chat.disabled = True
         self.role_select.disabled = True
         self.wait_time_select.disabled = True
 
@@ -117,6 +136,10 @@ class ConfigView(discord.ui.View):
         embed.add_field(
             name="Moderator category:",
             value=self.mod_category_name,
+            inline=False)
+        embed.add_field(
+            name="Output chat:",
+            value=self.output_channel_name,
             inline=False)
 
         if self.roles:
@@ -175,14 +198,44 @@ class ModManager(commands.Cog):
     @tasks.loop(minutes=1)
     async def quota_check(self) -> None:
         guilds = self.db.get_all_guilds()
+        now_time = int(datetime.timestamp(datetime.now()))
         for guild in guilds:
-            if guild.time_between_checks <= datetime.timestamp(
-                    datetime.now()) - guild.last_mod_check:
+            guild_instance: discord.Guild = await self.bot.get_guild(guild.id)
+            if guild.time_between_checks <= now_time - guild.last_mod_check:
                 # Do moderator status check:
-                mods = self.db.get_all_moderators()
+                mods = self.db.get_all_moderators_in_guild(guild.id)
+                moderator_string = ""
+                cleared_quota_string = ""
+                history_string = ""
                 for moderator in mods:
-                    if moderator.guild_id == guild.id:
-                        pass
+                    # Checking send, edit and delete quotas:
+                    quota = self.db.get_amount_of_actions_by_type(guild.time_between_checks, now_time, moderator.id, guild.id)
+                    checks = ['✅', '✅', '✅']
+                    check_complete = True
+                    if moderator.send_quota < quota[0]:
+                        # Did not complete send_quota.
+                        checks[0] = '❌'
+                        check_complete = False
+
+                    if moderator.edit_quota >= quota[1]:
+                        # Did not complete edit_quota.
+                        checks[1] = '❌'
+                        check_complete = False
+
+                    if moderator.delete_quota >= quota[2]:
+                        # Did not complete delete_quota.
+                        checks[2] = '❌'
+                        check_complete = False
+
+                    cleared_quota_string += f"S: {quota[0]}/{moderator.send_quota}{checks[0]} | E: {quota[1]}/{moderator.edit_quota}{checks[1]} | D: {quota[2]}/{moderator.delete_quota}{checks[2]}" + "\n"
+                    moderator_string += guild_instance.get_user(moderator.id).display_name + "\n"
+                    history_string += f"{check_complete}" + "\n"
+            embed=discord.Embed(title="Weekly Moderator Log", color=0x0084ff)
+            embed.add_field(name="Moderators", value=moderator_string, inline=True)
+            embed.add_field(name="Cleared", value=cleared_quota_string, inline=True)
+            embed.add_field(name="History", value=history_string, inline=True)
+            guild_instance.get_channel(guild.output_channel_id).send(embed=embed)
+                
 
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:

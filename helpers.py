@@ -145,7 +145,8 @@ class Guild:
             last_mod_check: int,
             time_between_checks: int,
             default_quotas: str | tuple[int, int, int],
-            member_count_channel_id: int) -> None:
+            member_count_channel_id: int,
+            output_channel_id: int) -> None:
         """Represents a guild config entry.
 
         Args:
@@ -154,7 +155,8 @@ class Guild:
             last_mod_check (int): Unix timestamp for last time the moderator stats were checked.
             time_between_checks (int): The amount of seconds that we should wait before next mod check.
             default_quota (str | tuple): The default quota for any new moderators.
-            member_cont_channel_id (int): The id of the channel to use for member counts
+            member_cont_channel_id (int): The id of the channel to use for member counts.
+            output_channel_id (int): The id of the channel to post logs and the like in.
         """
 
         if isinstance(default_quotas, str):
@@ -166,3 +168,4 @@ class Guild:
         self.time_between_checks = time_between_checks
         self.default_quotas: tuple[int, int, int] = default_quotas
         self.member_count_channel_id = member_count_channel_id
+        self.output_channel_id = output_channel_id
