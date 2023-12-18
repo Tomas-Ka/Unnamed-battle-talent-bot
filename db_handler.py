@@ -73,7 +73,6 @@ class DBHandler():
 
 # -------------------------- STICKY HANDLING --------------------------
 
-
     def create_sticky(
             self,
             channel_id: int,
@@ -186,7 +185,7 @@ class DBHandler():
         if isinstance(guild, Guild):
             guild = guild.id
 
-        mod_test = self.get_moderator(user_id)
+        mod_test = self.get_moderator(user_id, guild)
         if mod_test:
             if mod_test.guild_id == guild:
                 # User is in another guild we ignore the rest of this if
@@ -517,7 +516,6 @@ class DBHandler():
 
 # -------------------------- ACTION HANDLING --------------------------
 
-
     def create_action(
             self,
             action_type: str,
@@ -676,7 +674,6 @@ class DBHandler():
 
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
-
 
     def add_vacation_week(
             self,
@@ -903,7 +900,6 @@ class DBHandler():
 
 # -------------------------- CONFIG HANDLING --------------------------
 
-
     def add_guild(self,
                   guild_id: int,
                   default_quotas: tuple[int,
@@ -934,7 +930,7 @@ class DBHandler():
         """
         self._execute_query(guild_add_query,
                             (guild_id,
-                                "".join(map(str, default_quotas)),
+                                ",".join(map(str, default_quotas)),
                                 mod_category_id,
                                 last_mod_check,
                                 time_between_checks,
@@ -1033,7 +1029,7 @@ class DBHandler():
         """
         self._execute_query(member_count_channel_id_edit_query,
                             (member_count_channel_id, guild_id,))
-    
+
     def set_output_channel_id(
             self,
             guild_id: int,
@@ -1043,7 +1039,7 @@ class DBHandler():
         Args:
             guild_id (int): The id of the guild to update the value for.
             output_channel_id (int | None): The new value.
-        """        
+        """
         output_channel_id_edit_query = """
         UPDATE config
         SET

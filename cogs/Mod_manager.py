@@ -35,7 +35,7 @@ class ConfigView(discord.ui.View):
         self.mod_category_id = select.values[0].id
         self.mod_category_name = select.values[0].name
         await interaction.response.defer()
-    
+
     @discord.ui.select(cls=discord.ui.ChannelSelect,
                        channel_types=[discord.ChannelType.text],
                        placeholder="Select log output chat")
@@ -99,17 +99,17 @@ class ConfigView(discord.ui.View):
         # seconds in a day.
         wait_time = int(self.wait_time) * 86_400
 
-        # Setting up the member count voice channel.
-        count = interaction.guild.member_count
-        member_count_channel = await interaction.guild.create_voice_channel(f"members-{count}", reason="Setting up bot, creating channel for tracking member count", position=0, overwrites={interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=False)})
-
         guild = self.db.get_guild(interaction.guild_id)
         if not guild:
+            # Setting up the member count voice channel.
+            count = interaction.guild.member_count
+            member_count_channel = await interaction.guild.create_voice_channel(f"members - {count}", reason="Setting up bot, creating channel for tracking member count", position=0, overwrites={interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=False)})
+
             # Set some initial config stuff from the values we just recieved.
-            self.db.add_guild(interaction.guild_id, (0, 0, 0),
-                              self.mod_category_id, time.time(),
-                              wait_time, member_count_channel.id,
-                              self.output_channel_id)
+            self.db.add_guild(
+                interaction.guild_id, (0, 0, 0), self.mod_category_id, int(
+                    datetime.timestamp(
+                        datetime.now())), wait_time, member_count_channel.id, self.output_channel_id)
             guild = self.db.get_guild(interaction.guild_id)
 
         # Register all users who have the selected roles as moderators in the
@@ -192,6 +192,8 @@ class ModManager(commands.Cog):
         self.bot.tree.add_command(self.ctx_set_quotas)
         self.bot.tree.add_command(self.ctx_get_quotas)
 
+        self.quota_check.start()
+
     def cog_unload(self):
         self.quota_check.cancel()
 
@@ -200,7 +202,7 @@ class ModManager(commands.Cog):
         guilds = self.db.get_all_guilds()
         now_time = int(datetime.timestamp(datetime.now()))
         for guild in guilds:
-            guild_instance: discord.Guild = await self.bot.get_guild(guild.id)
+            guild_instance = self.bot.get_guild(guild.id)
             if guild.time_between_checks <= now_time - guild.last_mod_check:
                 # Do moderator status check:
                 mods = self.db.get_all_moderators_in_guild(guild.id)
@@ -209,33 +211,41 @@ class ModManager(commands.Cog):
                 history_string = ""
                 for moderator in mods:
                     # Checking send, edit and delete quotas:
-                    quota = self.db.get_amount_of_actions_by_type(guild.time_between_checks, now_time, moderator.id, guild.id)
+                    quota = self.db.get_amount_of_actions_by_type(
+                        guild.time_between_checks, now_time, moderator.id, guild.id)
                     checks = ['✅', '✅', '✅']
                     check_complete = True
-                    if moderator.send_quota < quota[0]:
+                    if moderator.send_quota > quota[0]:
                         # Did not complete send_quota.
                         checks[0] = '❌'
                         check_complete = False
 
-                    if moderator.edit_quota >= quota[1]:
+                    if moderator.edit_quota > quota[1]:
                         # Did not complete edit_quota.
                         checks[1] = '❌'
                         check_complete = False
 
-                    if moderator.delete_quota >= quota[2]:
+                    if moderator.delete_quota > quota[2]:
                         # Did not complete delete_quota.
                         checks[2] = '❌'
                         check_complete = False
 
                     cleared_quota_string += f"S: {quota[0]}/{moderator.send_quota}{checks[0]} | E: {quota[1]}/{moderator.edit_quota}{checks[1]} | D: {quota[2]}/{moderator.delete_quota}{checks[2]}" + "\n"
-                    moderator_string += guild_instance.get_user(moderator.id).display_name + "\n"
+                    moderator_string += guild_instance.get_member(
+                        moderator.id).display_name + "\n"
                     history_string += f"{check_complete}" + "\n"
-            embed=discord.Embed(title="Weekly Moderator Log", color=0x0084ff)
-            embed.add_field(name="Moderators", value=moderator_string, inline=True)
-            embed.add_field(name="Cleared", value=cleared_quota_string, inline=True)
-            embed.add_field(name="History", value=history_string, inline=True)
-            guild_instance.get_channel(guild.output_channel_id).send(embed=embed)
-                
+                embed = discord.Embed(
+                    title="Weekly Moderator Log", color=0x0084ff)
+                embed.add_field(name="Moderators", value=moderator_string, inline=True)
+                embed.add_field(name="Cleared", value=cleared_quota_string, inline=True)
+                embed.add_field(name="History", value=history_string, inline=True)
+                await guild_instance.get_channel(guild.output_channel_id).send(embed=embed)
+                self.db.set_last_mod_check(guild.id, now_time)
+
+    @quota_check.before_loop
+    async def before_quota_check(self) -> None:
+        # Wait to make sure we can use the bot before running our loop.
+        await self.bot.wait_until_ready()
 
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:
@@ -389,7 +399,7 @@ class ModManager(commands.Cog):
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
-        moderators = self.db.get_all_moderators()
+        moderators = self.db.get_all_moderators_in_guild(interaction.guild_id)
         if not moderators:
             await interaction.response.send_message(
                 embed=discord.Embed(
