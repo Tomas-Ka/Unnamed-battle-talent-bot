@@ -83,7 +83,6 @@ class MemberCountManager(commands.GroupCog, name="member_count"):
         await interaction.response.send_message("Server is not set up with this bot yet.\nPlease run /configure to do so.", ephemeral=True)
 
 
-
 # ------------------------------MAIN CODE------------------------------
 # This setup is required for the cog to setup and run,
 # and is run when the cog is loaded with bot.load_extensions()

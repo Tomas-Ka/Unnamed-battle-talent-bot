@@ -164,12 +164,12 @@ class ConfigView(discord.ui.View):
         await interaction.response.edit_message(view=None, embed=embed)
         self.stop()
 
+
 @app_commands.guild_only()
 class ConfigManager(commands.GroupCog, name="configure"):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.db: DBHandler = bot.db
-
 
     @app_commands.command(name="setup", description="Configures the bot")
     async def configure(self, interaction: discord.Interaction) -> None:
@@ -185,7 +185,8 @@ class ConfigManager(commands.GroupCog, name="configure"):
             colour=colour)
         await interaction.response.send_message(view=ConfigView(self.db), embed=embed)
 
-    @app_commands.command(name="default_quotas", description="Set default server quotas")
+    @app_commands.command(name="default_quotas",
+                          description="Set default server quotas")
     async def config_set_quotas(self, interaction: discord.Interaction, send_quota: int, edit_quota: int, delete_quota: int) -> None:
         """Slash command that sets the default quotas of the guild in the db.
         This does not update the quotas of current members, only the default for new members.
@@ -195,7 +196,7 @@ class ConfigManager(commands.GroupCog, name="configure"):
             send_quota (int): Quota for sent messages every timeframe.
             edit_quota (int): Quota for edited messages every timeframe.
             delete_quota (int): Quota for deleted messages every timeframe.
-        """        
+        """
         self.db.set_default_quotas(
             interaction.guild_id, (send_quota, edit_quota, delete_quota,))
         embed = discord.Embed(
