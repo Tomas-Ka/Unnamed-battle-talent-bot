@@ -187,7 +187,7 @@ class DBHandler():
 
         mod_test = self.get_moderator(user_id, guild)
         if mod_test:
-            if mod_test.guild_id == guild:
+            if not mod_test.guild_id == guild:
                 # User is in another guild we ignore the rest of this if
                 # statement.
                 pass

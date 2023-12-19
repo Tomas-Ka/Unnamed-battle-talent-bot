@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 global colour
 colour = 0xffffff
 
+
 class ModManager(commands.GroupCog, name="moderators"):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -155,6 +156,12 @@ class ModManager(commands.GroupCog, name="moderators"):
             guild = self.db.get_guild(interaction.guild_id)
             self.db.register_moderator(user.id, guild.default_quotas, guild)
             await interaction.response.send_message(f"Adding user {user.display_name} to the moderator list", ephemeral=True)
+        elif self.db.get_moderator(user.id, interaction.guild_id).active == 0:
+            # This moderator is already added to our guild, but has been
+            # deactivated
+            guild = self.db.get_guild(interaction.guild_id)
+            self.db.register_moderator(user.id, guild.default_quotas, guild)
+            await interaction.response.send_message(f"Adding back user {user.display_name} to the moderator list", ephemeral=True)
         else:
             await interaction.response.send_message(f"User {user.display_name} is already in the moderator list", ephemeral=True)
 
@@ -208,7 +215,9 @@ class ModManager(commands.GroupCog, name="moderators"):
             return
         await interaction.response.send_message(f"User {user.display_name} has the following quotas:\n``{mod.send_quota} sent messages, {mod.edit_quota} edited messages & {mod.delete_quota} deleted messages``", ephemeral=True)
 
-    @app_commands.command(description="Sends the current moderator list as an embed", name="list")
+    @app_commands.command(
+        description="Sends the current moderator list as an embed",
+        name="list")
     async def list_moderators(self, interaction: discord.Interaction) -> None:
         """Slash command to send a list of all moderators and their stats as an embed.
 
@@ -241,7 +250,47 @@ class ModManager(commands.GroupCog, name="moderators"):
 
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(description="Gets the moderator stats for a user in a timeframe", name="get_stats")
+    @app_commands.command(
+        description="Updates quotas for all active moderators. Omitted values will use guild defaults.",
+        name="set_all_quotas")
+    async def set_all_moderator_quotas(self, interaction: discord.Interaction, send_quota: int = None, edit_quota: int = None, delete_quota: int = None) -> None:
+        """Slash command to update the quotas for all active moderators.
+        Any value left as none will use the guild default instead.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+            send_quota (int, optional): New value for send_quota.
+            edit_quota (int, optional): New value for edit_quota.
+            delete_quota (int, optional): New value for delete_quota.
+        """
+        guild = self.db.get_guild(interaction.guild_id)
+
+        # Check if any arguments were passed.
+        # If any arguments are set to None.
+        # Default to the guild default quotas.
+        if send_quota is None:
+            send_quota = guild.send_quota
+
+        if edit_quota is None:
+            edit_quota = guild.edit_quota
+
+        if delete_quota is None:
+            delete_quota = guild.delete_quota
+
+        # Update quotas per moderator
+        moderators = self.db.get_all_moderators_in_guild(guild.id)
+        response_string = "Updated quotas for the following moderators:\n"
+        for moderator in moderators:
+            self.db.set_quota(
+                moderator.id, [
+                    send_quota, edit_quota, delete_quota], guild.id)
+            response_string += "- " + \
+                interaction.guild.get_member(moderator.id).display_name + "\n"
+        await interaction.response.send_message(response_string)
+
+    @app_commands.command(
+        description="Gets the moderator stats for a user in a timeframe",
+        name="get_stats")
     async def get_moderator_stats(self, interaction: discord.Interaction, user: discord.Member, earlier_time: str, later_time: str = None) -> None:
         """Slash command to get the moderator stats for a given user in a certain timeframe.
 
@@ -250,7 +299,7 @@ class ModManager(commands.GroupCog, name="moderators"):
             user (discord.Member): The user we want to get stats for.
             earlier_time (str): Start of timeframe. Either a date (DD/MM/YYY) or an amount of days ago (xd).
             later_time (str, optional): End of timeframe. Same format as earlier_time. If omitted it will be set to now.
-        """        
+        """
 
         if not self.is_moderator(user):
             await interaction.response.send_message(f"User {user.display_name} is not a moderator.")

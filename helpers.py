@@ -62,9 +62,20 @@ class Guild:
         self.mod_category_id = mod_category_id
         self.last_mod_check = last_mod_check
         self.time_between_checks = time_between_checks
-        self.default_quotas: tuple[int, int, int] = default_quotas
+        self.default_quotas = default_quotas
         self.member_count_channel_id = member_count_channel_id
         self.output_channel_id = output_channel_id
+
+    @property
+    def default_quotas(self) -> tuple[int, int, int]:
+        return [self.send_quota, self.edit_quota, self.delete_quota]
+
+    @default_quotas.setter
+    def default_quotas(self, val: tuple[int, int, int]) -> None:
+        self.send_quota = val[0]
+        self.edit_quota = val[1]
+        self.delete_quota = val[2]
+
 
 class Moderator:
     def __init__(
