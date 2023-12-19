@@ -1,4 +1,3 @@
-# -*- conding: UTF-8 -*-
 from discord.ext import commands, tasks
 from discord import app_commands
 import discord
@@ -84,6 +83,9 @@ class MemberCountManager(commands.Cog):
         await interaction.response.send_message("Member count channel created!", ephemeral=True)
 
 
+# ------------------------------MAIN CODE------------------------------
+# This setup is required for the cog to setup and run,
+# and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
-    print(f"\tcogs.Member_count_manager begin loading")
+    print(f"\tcogs.member_count_manager begin loading")
     await bot.add_cog(MemberCountManager(bot))

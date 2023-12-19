@@ -1,4 +1,3 @@
-# -*- coding: UTF-8 -*-
 from discord.ext import commands
 from discord import app_commands
 import discord
@@ -118,6 +117,9 @@ class CreateStickyModal(discord.ui.Modal):
         await super().on_error(interaction, error)
 
 
+# ------------------------------MAIN CODE------------------------------
+# This setup is required for the cog to setup and run,
+# and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.sticky_manager begin loading")
     await bot.add_cog(StickyManager(bot))
