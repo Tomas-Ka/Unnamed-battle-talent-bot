@@ -137,7 +137,8 @@ class DBHandler():
         """
         sticky_query = """
         SELECT * FROM stickies
-        WHERE channel_id = ?"""
+        WHERE channel_id = ?
+        """
 
         # Return the message_id of the entry in the database as a StickyMessage
         # (second value of the tuple)
@@ -168,17 +169,31 @@ class DBHandler():
 
 # --------------------------- MOD HANDLING ----------------------------
 
-    def register_moderator(
-            self, user_id: int, quotas: tuple[int, int, int]) -> None:
+    def register_moderator(self,
+                           user_id: int,
+                           quotas: tuple[int,
+                                         int,
+                                         int],
+                           guild: int | Guild) -> None:
         """Adds a new moderator to the object's database.
 
         Args:
             user_id (int): Discord id of the user.
             quotas (tuple[int, int, int]): The quotas the user should reach weekly.
+            guild (int | Guild): The id or guild object for the user's guild.
         """
-        mod_test = self.get_moderator(user_id)
+        if isinstance(guild, Guild):
+            guild = guild.id
+
+        mod_test = self.get_moderator(user_id, guild)
         if mod_test:
-            if mod_test.active == 0:
+            if mod_test.guild_id == guild:
+                # User is in another guild we ignore the rest of this if
+                # statement.
+                pass
+            elif mod_test.active == 0:
+                # User exists in db, we can just set them to active and update
+                # their quotas.
                 moderator_registration_query = """
                 UPDATE moderators
                 SET
@@ -194,23 +209,34 @@ class DBHandler():
                     moderator_registration_query, (*quotas, user_id,))
                 return
             else:
-                raise (ValueError(f"User with id: {user_id} already exists."))
+                raise (
+                    ValueError(f"User with id: {user_id} already exists in this guild."))
 
         moderator_registration_query = """
         INSERT INTO
-            moderators (user_id, send_quota, edit_quota, delete_quota, consecutive_completed_weeks, active, vacation_days)
+            moderators (user_id, send_quota, edit_quota, delete_quota, consecutive_completed_weeks, active, vacation_days, guild_id)
         VALUES
-            (?, ?, ?, ?, 0, 1, 0);
+            (?, ?, ?, ?, 0, 1, 0, ?);
         """
-        self._execute_query(moderator_registration_query, (user_id, *quotas,))
+        self._execute_query(moderator_registration_query,
+                            (user_id, *quotas, guild,))
 
-    def set_quota(self, user_id: int, quotas: tuple[int, int, int]) -> None:
+    def set_quota(self,
+                  user_id: int,
+                  quotas: tuple[int,
+                                int,
+                                int],
+                  guild: int | Guild) -> None:
         """Edits the weekly quota for the given user in the object's database.
 
         Args:
             user_id (int): Discord id of the user to edit.
             quotas (tuple[int, int, int]): The new weekly quotas for the user.
+            guild (int | Guild): The id or guild object for the user's guild.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         moderator_edit_query = """
         UPDATE moderators
         SET
@@ -218,16 +244,23 @@ class DBHandler():
             edit_quota = ?,
             delete_quota = ?
         WHERE
-            user_id == ?
+            user_id = ?
+        AND
+            guild_id = ?
         """
-        self._execute_query(moderator_edit_query, (*quotas, user_id,))
+        self._execute_query(moderator_edit_query, (*quotas, user_id, guild,))
 
-    def set_all_quotas(self, quotas: tuple[int, int, int]) -> None:
+    def set_all_quotas(
+            self, quotas: tuple[int, int, int], guild: int | Guild) -> None:
         """Edits the weekly quota for all the users in the object's database.
 
         Args:
             quotas (tuple[int, int, int]): The new weekly quota for all users.
+            guild (int | Guild): The id or guild object for the user's guild.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         # make sure we don't change removed moderators
         moderator_edit_query = """
         UPDATE moderators
@@ -236,82 +269,120 @@ class DBHandler():
             edit_quota = ?,
             delete_quota = ?
         WHERE
-            active == 1
+            active = 1
+        AND
+            guild_id = ?
         """
-        self._execute_query(moderator_edit_query, (*quotas,))
+        self._execute_query(moderator_edit_query, (*quotas, guild,))
 
     def set_consecutive_completed_weeks(
-            self, user_id: int, new_value: int) -> None:
+            self, user_id: int, new_value: int, guild: int | Guild) -> None:
         """Sets the amount of consecutive completed weeks for the given user in the object's database.
 
         Args:
             user_id (int): Discord id of the user to edit.
             new_value (int): The new value to set consecutive_completed_weeks to.
+            guild (int | Guild): The id or guild object for the user's guild.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         moderator_edit_query = """
         UPDATE moderators
         SET
             consecutive_completed_weeks = ?
         WHERE
             user_id = ?
+        AND
+            guild_id = ?
         """
-        self._execute_query(moderator_edit_query, (new_value, user_id,))
+        self._execute_query(moderator_edit_query, (new_value, user_id, guild,))
 
     def increment_consecutive_completed_weeks(
-            self, user_id: int, amount: int = 1) -> None:
+            self, user_id: int, guild: int | Guild, amount: int = 1) -> None:
         """Increments the amount consecutive completed weeks for the given user by the given amount in the object's database.
 
         Args:
             user_id (int): Discord id of the user to edit.
+            guild (int | Guild): The id or guild object for the user's guild.
             amount (int, optional): The amount to increment the field with. Defaults to 1.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         moderator_edit_query = """
         UPDATE moderators
         SET
             consecutive_completed_weeks = consecutive_completed_weeks + ?
         WHERE
             user_id = ?
+        AND
+            guild_id = ?
         """
-        self._execute_query(moderator_edit_query, (amount, user_id,))
+        self._execute_query(moderator_edit_query, (amount, user_id, guild,))
 
-    def set_vacation_days(self, user_id: int, new_value: int) -> None:
+    def set_vacation_days(
+            self,
+            user_id: int,
+            new_value: int,
+            guild: int | Guild) -> None:
         """Sets the amount of vacation days for the given user in the object's database.
 
         Args:
             user_id (int): Discord id of the user to edit.
             new_value (int): The new value to set vacation_days to.
+            guild (int | Guild): The id or guild object for the user's guild.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         moderator_edit_query = """
         UPDATE moderators
         SET
             vacation_days = ?
         WHERE
             user_id = ?
+        AND
+            guild_id = ?
         """
-        self._execute_query(moderator_edit_query, (new_value, user_id,))
+        self._execute_query(moderator_edit_query, (new_value, user_id, guild,))
 
-    def increment_vacation_days(self, user_id: int, amount: int = 1) -> None:
+    def increment_vacation_days(
+            self,
+            user_id: int,
+            guild: int | Guild,
+            amount: int = 1) -> None:
         """Increments the amount of vacation days for the given user by the given amount in the object's database.
 
         Args:
             user_id (int): Discord id of the user to edit.
+            guild (int | Guild): The id or guild object for the user's guild.
             amount (int, optional): The amount to increment the field with. Defaults to 1.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         moderator_edit_query = """
         UPDATE moderators
         SET
             vacation_days = vacation_days + ?
         WHERE
             user_id = ?
+        AND
+            guild_id = ?
         """
-        self._execute_query(moderator_edit_query, (amount, user_id,))
+        self._execute_query(moderator_edit_query, (amount, user_id, guild,))
 
-    def de_register_moderator(self, user_id: int) -> None:
+    def de_register_moderator(self, user_id: int, guild: int | Guild) -> None:
         """Modifies a moderator entry to no longer be active, and no longer have any quotas to fill, given the id of a user to edit.
 
         Args:
             user_id (int): Discord id of the user to edit
+            guild (int | Guild): The id or guild object for the user's guild.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         moderator_de_registration_query = """
         UPDATE moderators
         SET
@@ -322,35 +393,43 @@ class DBHandler():
             delete_quota = 0
         WHERE
             user_id = ?
+        AND
+            guild_id = ?
         """
-        self._execute_query(moderator_de_registration_query, (user_id,))
+        self._execute_query(moderator_de_registration_query, (user_id, guild))
 
-    def get_moderator(self, user_id: int) -> Moderator:
+    def get_moderator(self, user_id: int, guild: int | Guild) -> Moderator:
         """Returns a moderator given their discord user id.
 
         Args:
             user_id (int): Discord id of the user to get.
+            guild (int | Guild): The id or guild object for the user's guild.
 
         Returns:
-            Moderator: A moderator object containing all data pertaining to the user
+            Moderator: A moderator object containing all data pertaining to the user.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         moderator_get_query = """
         SELECT * FROM moderators
         WHERE
             user_id = ?
+        AND
+            guild_id = ?
         """
         result = self._execute_read_query(
-            moderator_get_query, (user_id,))
+            moderator_get_query, (user_id, guild,))
 
         if result:
             return Moderator(*result)
         return None
 
     def get_all_moderators(self) -> list[Moderator]:
-        """Returns a list of all active moderators in the object's database
+        """Returns a list of all active moderators in the object's database.
 
         Returns:
-            list[Moderator]: List of Moderator objects
+            list[Moderator]: List of Moderator objects.
         """
         moderator_get_query = """
         SELECT * FROM moderators
@@ -364,11 +443,39 @@ class DBHandler():
             return [Moderator(*mod) for mod in result]
         return []
 
-    def get_all_inactive_moderators(self) -> list[Moderator]:
-        """Returns a list of all inactive moderators in the object's database
+    def get_all_moderators_in_guild(
+            self, guild: int | Guild) -> list[Moderator]:
+        """Returns a list of all active moderators in the given guild
+        from the object's database.
+
+        Args:
+            guild_id (int): The id of the guild.
 
         Returns:
-            list[Moderator]: List of Moderator objects
+            List[Moderator]: List of moderator objects.
+        """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
+        moderator_get_query = """
+        SELECT * FROM moderators
+        WHERE
+            active = 1
+        AND
+            guild_id = ?
+        """
+        result = self._execute_multiple_read_query(
+            moderator_get_query, (guild,))
+
+        if result:
+            return [Moderator(*mod) for mod in result]
+        return []
+
+    def get_all_inactive_moderators(self) -> list[Moderator]:
+        """Returns a list of all inactive moderators in the object's database.
+
+        Returns:
+            list[Moderator]: List of Moderator objects.
         """
         moderator_get_query = """
         SELECT * FROM moderators
@@ -377,6 +484,30 @@ class DBHandler():
         """
         result = self._execute_multiple_read_query(
             moderator_get_query)
+
+        if result:
+            return [Moderator(*mod) for mod in result]
+        return []
+
+    def get_all_inactive_moderators_in_guild(self, guild: int | Guild):
+        """Returns a list of all inactive moderators in the specified guild
+        from the object's database.
+
+        Returns:
+            list[Moderator]: List of Moderator objects.
+        """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
+        moderator_get_query = """
+        SELECT * FROM moderators
+        WHERE
+            active = 0
+        AND
+            guild_id = ?
+        """
+        result = self._execute_multiple_read_query(
+            moderator_get_query, (guild,))
 
         if result:
             return [Moderator(*mod) for mod in result]
@@ -391,6 +522,7 @@ class DBHandler():
             moderator_id: int,
             timestamp: int,
             channel_id: int,
+            guild: int | Guild,
             message_id: int = None) -> None:
         """Adds a new action to the object's database
 
@@ -399,13 +531,17 @@ class DBHandler():
             moderator_id (int): Discord ID of the moderator that executed the action.
             timestamp (int): Unix timestamp of when the action was executed.
             channel_id (int): Discord ID of the channel the action occured in.
+            guild (int | Guild): The id or guild object for the user's guild.
             message_id (int, optional): Discord ID of the message the action is referencing. Defaults to None.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         action_registration_query = """
         INSERT INTO
-            actions (type, message_id, channel_id, mod_id, timestamp)
+            actions (type, message_id, channel_id, mod_id, timestamp, guild_id)
         VALUES
-            (?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?)
         """
         self._execute_query(
             action_registration_query,
@@ -413,20 +549,25 @@ class DBHandler():
              message_id,
              channel_id,
              moderator_id,
-             timestamp))
+             timestamp,
+             guild,))
 
     def get_all_actions(self, start_time: int, end_time: int,
-                        moderator_id: int) -> list[Action]:
+                        moderator_id: int, guild: int | Guild) -> list[Action]:
         """Returns a list of all action sent by the given moderator in the given timeframe.
 
         Args:
             start_time (int): Beginning of the timeframe (unix timestamp).
             end_time (int): End of the timeframe (unix timestamp).
             moderator_id (int): Id of the given moderator.
+            guild (int | Guild): The id or guild object for the user's guild.
 
         Returns:
             list[Action]: A list containing Action objects.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         action_get_query = """
         SELECT * FROM actions
         WHERE
@@ -437,29 +578,24 @@ class DBHandler():
             ?
         AND
             "mod_id" = ?
+        AND
+            "guild_id" = ?
         """
         result = list(self._execute_multiple_read_query(
             action_get_query,
-            (start_time, end_time, moderator_id,)))
-        result_list = []
+            (start_time, end_time, moderator_id, guild,)))
 
         if result:
-            result = [list(entry) for entry in result]
-            message_ids = [m.pop(2) for m in result]
-            for i in range(0, len(result)):
-                result_list.append(
-                    Action(
-                        *result[i],
-                        message_id=message_ids[i]))
-
-        return result_list
+            return [Action(*action) for action in result]
+        return []
 
     def get_all_actions_of_type(
             self,
             start_time: int,
             end_time: int,
             moderator_id: int,
-            type: str) -> list[Action]:
+            type: str,
+            guild: int | Guild) -> list[Action]:
         """Returns a list of of all actions with the specified type by the given moderator in the given timeframe
 
         Args:
@@ -467,10 +603,14 @@ class DBHandler():
             end_time (int): End of the timeframe (unix timestamp).
             moderator_id (int): Id of the given moderator.
             type (str): a string containing the action type ("sent", "edited" or "deleted")
+            guild (int | Guild): The id or guild object for the user's guild.
 
         Returns:
             list[Action]: A list containing all Action objects of the given type.
+
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
 
         action_get_query = """
         SELECT * FROM actions
@@ -482,26 +622,32 @@ class DBHandler():
         AND
             "mod_id" = ?
         AND
-            "type" = ?"""
+            "type" = ?
+        AND
+            "guild_id" = ?
+        """
 
-        result = list(self._execute_multiple_read_query(
-            action_get_query, (start_time, end_time, moderator_id, type,)))
-        result_list = []
+        result = list(
+            self._execute_multiple_read_query(
+                action_get_query,
+                (start_time,
+                 end_time,
+                 moderator_id,
+                 type,
+                 guild,
+                 )))
 
         if result:
-            result = [list(entry) for entry in result]
-            message_ids = [m.pop(2) for m in result]
-            for i in range(0, len(result)):
-                if result[i][1] == type:
-                    result_list.append(
-                        Action(
-                            *result[i],
-                            message_id=message_ids[i]))
+            return [Action(*action) for action in result]
+        return []
 
-        return result_list
-
-    def get_amount_of_actions_by_type(
-            self, start_time: int, end_time: int, moderator_id: int) -> tuple[int, int, int]:
+    def get_amount_of_actions_by_type(self,
+                                      start_time: int,
+                                      end_time: int,
+                                      moderator_id: int,
+                                      guild: int | Guild) -> tuple[int,
+                                                                   int,
+                                                                   int]:
         """Returns a tuple containing the amount of sent, edited and deleted messages by the given moderator in the given timeframe.
         Format is always (sent, edited, deleted)
 
@@ -509,71 +655,100 @@ class DBHandler():
             start_time (int): Beginning of the timeframe (unix timestamp).
             end_time (int): End of the timeframe (unix timestamp).
             moderator_id (int): Id of the given moderator.
+            guild (int | Guild): The id or guild object for the user's guild.
 
         Returns:
             tuple[int, int, int]: A tuple containg the amount of hits for each category.
         """
+
         return (
             len(
                 self.get_all_actions_of_type(
-                    start_time, end_time, moderator_id, "sent")),
+                    start_time, end_time, moderator_id, "sent", guild)),
             len(
                 self.get_all_actions_of_type(
-                    start_time, end_time, moderator_id, "edited")),
+                    start_time, end_time, moderator_id, "edited", guild)),
             len(
                 self.get_all_actions_of_type(
-                    start_time, end_time, moderator_id, "deleted")))
+                    start_time, end_time, moderator_id, "deleted", guild)))
 
 
 # ---------------------- VACATION WEEK HANDLING -----------------------
 
-    def add_vacation_week(self, moderator_id: int, date: str) -> None:
+    def add_vacation_week(
+            self,
+            moderator_id: int,
+            date: str,
+            guild: int | Guild) -> None:
         """Adds a new action to the object's database.
 
         Args:
             moderator_id (int): Discord ID of the moderator to bind the vacation to.
             date (str): The week that is being taken as vacation, format "YYYY-WW".
+            guild (int | Guild): The id or guild object for the user's guild.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         vacation_week_add_query = """
         INSERT INTO
-            vacation_weeks (date, mod_id)
+            vacation_weeks (date, mod_id, guild_id)
         VALUES
-            (?,?);
+            (?, ?, ?);
         """
-        self._execute_query(vacation_week_add_query, (date, moderator_id,))
+        self._execute_query(vacation_week_add_query,
+                            (date, moderator_id, guild,))
 
-    def remove_vacation_week(self, user_id: int, date: str) -> None:
+    def remove_vacation_week(
+            self,
+            user_id: int,
+            date: str,
+            guild: int | Guild) -> None:
         """Remove an action from the object's database given a user_id and date.
 
         Args:
             user_id (int): Discord ID of the moderator to bind the vacation to.
             date (str): The week that of the vacation, format "YYYY-WW".
+            guild (int | Guild): The id or guild object for the user's guild.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         vacation_week_remove_query = """
         DELETE FROM vacation_weeks
         WHERE
             date = ?
         AND
             mod_id = ?
+        AND
+            guild_id = ?
         """
-        self._execute_query(vacation_week_remove_query, (date, user_id,))
+        self._execute_query(vacation_week_remove_query, (date, user_id, guild))
 
-    def get_all_vacation_weeks(self, user_id: int) -> list[VacationWeek]:
+    def get_all_vacation_weeks(
+            self,
+            user_id: int,
+            guild: int | Guild) -> list[VacationWeek]:
         """Returns a list of all vacation weeks in the object's database.
 
         Args:
             user_id (int): Discord ID of the moderator to get the vacation from.
-
+            guild (int | Guild): The id or guild object for the user's guild.
         Returns:
             list[VacationWeek]: List of all vacation weeks for the given user.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         vacation_week_get_query = """
         SELECT * FROM vacation_weeks
         WHERE
             mod_id = ?
+        AND
+            guild_id = ?
         """
         result = self._execute_multiple_read_query(
-            vacation_week_get_query, (user_id,))
+            vacation_week_get_query, (user_id, guild,))
 
         if result:
             return [VacationWeek(*week) for week in result]
@@ -583,17 +758,22 @@ class DBHandler():
             self,
             user_id: int,
             start_date: str,
-            end_date: str) -> list[VacationWeek]:
+            end_date: str,
+            guild: int | Guild) -> list[VacationWeek]:
         """Returns a list of all vacation weeks during a period in the object's database given a user_id and the time frame.
 
         Args:
             user_id (int): Discord ID of the moderator to get the vacation from.
             start_date (str): Beginning of the timeframe (format "YYYY-MM").
             end_date (str): End of the timeframe (format "YYYY-MM").
+            guild (int | Guild): The id or guild object for the user's guild.
 
         Returns:
             list[VacationWeek]: List of all vacation weeks for the given user during the given time period.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         vacation_week_get_query = """
         SELECT * FROM vacation_weeks
         WHERE
@@ -604,67 +784,97 @@ class DBHandler():
             ?
         AND
             "mod_id" = ?
+        AND
+            "guild_id" = ?
         """
         result = self._execute_multiple_read_query(
             vacation_week_get_query,
             (start_date,
              end_date,
-             user_id,))
+             user_id,
+             guild,))
         if result:
             return [VacationWeek(*w) for w in result]
         return []
 
-    def is_vacation_week(self, user_id: int, date: str) -> bool:
+    def is_vacation_week(
+            self,
+            user_id: int,
+            date: str,
+            guild: int | Guild) -> bool:
         """Checks if a given user has taken the given week as vacation.
 
         Args:
             user_id (int): Discord ID of the moderator the check vacation for.
             date (str): The week of the vacation to check, format "YYYY-WW".
+            guild (int | Guild): The id or guild object for the user's guild.
 
         Returns:
             bool: If the given week was vacation for the given user.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         vacation_week_check_query = """
         SELECT * FROM vacation_weeks
         WHERE
             mod_id = ?
         AND
             date = ?
+        AND
+            guild_id = ?
         """
         if self._execute_read_query(
-                vacation_week_check_query, (user_id, date,)):
+                vacation_week_check_query, (user_id, date, guild,)):
             return True
         return False
 
-    def amount_of_vacation_weeks(self, user_id: int) -> int:
+    def amount_of_vacation_weeks(
+            self,
+            user_id: int,
+            guild: int | Guild) -> int:
         """Returns the number of total vacation weeks a user has taken.
 
         Args:
             user_id (int): Discord ID of the moderator to count vacation weeks for.
+            guild (int | Guild): The id or guild object for the user's guild.
 
         Returns:
             int: The amount of total vacation weeks.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         vacation_week_count_query = """
         SELECT * FROM vacation_weeks
         WHERE
             mod_id = ?
+        AND
+            guild_id = ?
         """
         return len(self._execute_multiple_read_query(
-            vacation_week_count_query, (user_id,)))
+            vacation_week_count_query, (user_id, guild,)))
 
     def amount_of_vacation_weeks_during_period(
-            self, user_id: int, start_date: str, end_date: str) -> int:
+            self,
+            user_id: int,
+            start_date: str,
+            end_date: str,
+            guild: int | Guild) -> int:
         """Returns the number of vacation weeks a user has taken between the given dates.
 
         Args:
             user_id (int): Discord ID of the moderator to count vacation weeks for.
             start_date (str): The beginning of the time period to check. Format "YYYY-WW".
             end_date (str): The end of the time period to check (inclusive). Format "YYYY-WW".
+            guild (int | Guild): The id or guild object for the user's guild.
 
         Returns:
             int: The amount of vacation weeks during the period.
         """
+        if isinstance(guild, Guild):
+            guild = guild.id
+
         vacation_week_count_query = """
         SELECT * FROM vacation_weeks
         WHERE
@@ -675,9 +885,17 @@ class DBHandler():
             ?
         AND
             "mod_id" = ?
+        AND
+            "guild_id" = ?
         """
-        return len(self._execute_multiple_read_query(
-            vacation_week_count_query, (start_date, end_date, user_id,)))
+        return len(
+            self._execute_multiple_read_query(
+                vacation_week_count_query,
+                (start_date,
+                 end_date,
+                 user_id,
+                 guild,
+                 )))
 
 
 # -------------------------- CONFIG HANDLING --------------------------
@@ -690,7 +908,8 @@ class DBHandler():
                   mod_category_id: int = None,
                   last_mod_check: int = None,
                   time_between_checks: int = None,
-                  member_count_channel_id: int = None) -> None:
+                  member_count_channel_id: int = None,
+                  output_channel_id: int = None) -> None:
         """Creates a new entry for the given guild in the database.
 
         Args:
@@ -699,21 +918,24 @@ class DBHandler():
             mod_category_id (int, optional): The id of the moderator category. Defaults to None.
             last_mod_check (int, optional): Unix timestamp of last time the moderators were checked. Defaults to None.
             time_between_checks (int, optional): Amount of seconds we should wait between checking the moderators. Defaults to None.
+            member_count_channel_id (int, optional): The id of the created membercount channel. Defaults to None.
+            output_channel_id (int, optional): The id of the channel to output any stats to. Defaults to None.
         """
 
         guild_add_query = """
         INSERT INTO
-            config(guild_id, default_quotas, mod_category_id, last_mod_check, time_between_checks, member_count_channel_id)
+            config(guild_id, default_quotas, mod_category_id, last_mod_check, time_between_checks, member_count_channel_id, output_channel_id)
         VALUES
-            (?, ?, ?, ?, ?, ?);
+            (?, ?, ?, ?, ?, ?, ?);
         """
         self._execute_query(guild_add_query,
                             (guild_id,
-                                "".join(map(str, default_quotas)),
+                                ",".join(map(str, default_quotas)),
                                 mod_category_id,
                                 last_mod_check,
                                 time_between_checks,
                                 member_count_channel_id,
+                                output_channel_id,
                              ))
 
     def set_mod_category_id(self, guild_id: int, mod_category_id: int) -> None:
@@ -792,6 +1014,12 @@ class DBHandler():
             self,
             guild_id: int,
             member_count_channel_id: int | None) -> None:
+        """Sets the member count channel id for the given guild.
+
+        Args:
+            guild_id (int): The id of the guild to update the value for.
+            member_count_channel_id (int | None): The new value.
+        """
         member_count_channel_id_edit_query = """
         UPDATE config
         SET
@@ -801,6 +1029,26 @@ class DBHandler():
         """
         self._execute_query(member_count_channel_id_edit_query,
                             (member_count_channel_id, guild_id,))
+
+    def set_output_channel_id(
+            self,
+            guild_id: int,
+            output_channel_id: int | None) -> None:
+        """Sets the channel to output any data to for the given guild.
+
+        Args:
+            guild_id (int): The id of the guild to update the value for.
+            output_channel_id (int | None): The new value.
+        """
+        output_channel_id_edit_query = """
+        UPDATE config
+        SET
+            output_channel_id = ?
+        WHERE
+            guild_id = ?
+        """
+        self._execute_query(output_channel_id_edit_query,
+                            (output_channel_id, guild_id,))
 
     def get_guild(self, guild_id: int) -> Guild:
         """Gets a guild given it's id.
@@ -857,7 +1105,8 @@ if __name__ == "__main__":
         "delete_quota" INTEGER NOT NULL,
         "consecutive_completed_weeks" INTEGER NOT NULL,
         "vacation_days" INTEGER NOT NULL,
-        "active" INTEGER NOT NULL
+        "active" INTEGER NOT NULL,
+        "guild_id" INTEGER REFERENCES config NOT NULL
     );
     """
     DB._execute_query(moderator_table_query)
@@ -869,7 +1118,8 @@ if __name__ == "__main__":
         "message_id" INTEGER,
         "channel_id" INTEGER NOT NULL,
         "mod_id" INTEGER REFERENCES moderators NOT NULL,
-        "timestamp" INTEGER NOT NULL
+        "timestamp" INTEGER NOT NULL,
+        "guild_id" INTEGER REFERENCES config NOT NULL
     );
     """
     DB._execute_query(action_table_query)
@@ -877,8 +1127,10 @@ if __name__ == "__main__":
     vacation_table_query = """
     CREATE TABLE IF NOT EXISTS vacation_weeks (
         "date" TEXT UNIQUE NOT NULL,
-        "mod_id" INTEGER REFERENCES moderators NOT NULL
-    )"""
+        "mod_id" INTEGER REFERENCES moderators NOT NULL,
+        "guild_id" INTEGER REFERENCES config NOT NULL
+    );
+    """
     DB._execute_query(vacation_table_query)
 
     config_table_query = """
@@ -888,6 +1140,8 @@ if __name__ == "__main__":
         "last_mod_check" INTEGER,
         "time_between_checks" INTEGER,
         "default_quotas" TEXT NOT NULL,
-        "member_count_channel_id" INTEGER
-    );"""
+        "member_count_channel_id" INTEGER,
+        "output_channel_id" INTEGER
+    );
+    """
     DB._execute_query(config_table_query)

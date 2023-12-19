@@ -1,7 +1,7 @@
 from db_handler import DBHandler
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 import time
 from datetime import datetime, timezone, timedelta
 
@@ -37,6 +37,61 @@ class ModManager(commands.Cog):
         self.bot.tree.add_command(self.ctx_set_quotas)
         self.bot.tree.add_command(self.ctx_get_quotas)
 
+        self.quota_check.start()
+
+    def cog_unload(self):
+        self.quota_check.cancel()
+
+    @tasks.loop(minutes=1)
+    async def quota_check(self) -> None:
+        guilds = self.db.get_all_guilds()
+        now_time = int(datetime.timestamp(datetime.now()))
+        for guild in guilds:
+            guild_instance = self.bot.get_guild(guild.id)
+            if guild.time_between_checks <= now_time - guild.last_mod_check:
+                # Do moderator status check:
+                mods = self.db.get_all_moderators_in_guild(guild.id)
+                moderator_string = ""
+                cleared_quota_string = ""
+                history_string = ""
+                for moderator in mods:
+                    # Checking send, edit and delete quotas:
+                    quota = self.db.get_amount_of_actions_by_type(
+                        guild.time_between_checks, now_time, moderator.id, guild.id)
+                    checks = ['✅', '✅', '✅']
+                    check_complete = True
+                    if moderator.send_quota > quota[0]:
+                        # Did not complete send_quota.
+                        checks[0] = '❌'
+                        check_complete = False
+
+                    if moderator.edit_quota > quota[1]:
+                        # Did not complete edit_quota.
+                        checks[1] = '❌'
+                        check_complete = False
+
+                    if moderator.delete_quota > quota[2]:
+                        # Did not complete delete_quota.
+                        checks[2] = '❌'
+                        check_complete = False
+
+                    cleared_quota_string += f"S: {quota[0]}/{moderator.send_quota}{checks[0]} | E: {quota[1]}/{moderator.edit_quota}{checks[1]} | D: {quota[2]}/{moderator.delete_quota}{checks[2]}" + "\n"
+                    moderator_string += guild_instance.get_member(
+                        moderator.id).display_name + "\n"
+                    history_string += f"{check_complete}" + "\n"
+                embed = discord.Embed(
+                    title="Weekly Moderator Log", color=0x0084ff)
+                embed.add_field(name="Moderators", value=moderator_string, inline=True)
+                embed.add_field(name="Cleared", value=cleared_quota_string, inline=True)
+                embed.add_field(name="History", value=history_string, inline=True)
+                await guild_instance.get_channel(guild.output_channel_id).send(embed=embed)
+                self.db.set_last_mod_check(guild.id, now_time)
+
+    @quota_check.before_loop
+    async def before_quota_check(self) -> None:
+        # Wait to make sure we can use the bot before running our loop.
+        await self.bot.wait_until_ready()
+
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:
         # Check to make sure author isn't the bot itself.
@@ -49,7 +104,7 @@ class ModManager(commands.Cog):
         if not msg.channel.category_id == guild.mod_category_id and self.is_moderator(
                 msg.author):
             self.db.create_action("sent", msg.author.id, int(
-                msg.created_at.timestamp()), msg.channel.id, msg.id)
+                msg.created_at.timestamp()), msg.channel.id, guild, msg.id)
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
@@ -63,10 +118,10 @@ class ModManager(commands.Cog):
         if not after.channel.category_id == guild.mod_category_id and self.is_moderator(
                 after.author):
             self.db.create_action("edited", after.author.id, int(
-                after.edited_at.timestamp()), after.channel.id, after.id)
+                after.edited_at.timestamp()), after.channel.id, guild, after.id)
 
     @commands.Cog.listener()
-    async def on_audit_log_entry_create(self, entry: discord.AuditLogEntry):
+    async def on_audit_log_entry_create(self, entry: discord.AuditLogEntry) -> None:
 
         # TODO; Discord's audit logs are a bit strange. A new entry will only be
         # TODO; created if there is not already an entry containing the same 2 users,
@@ -89,7 +144,7 @@ class ModManager(commands.Cog):
                     entry.user):
                 self.db.create_action(
                     "deleted", entry.user.id, int(
-                        entry.created_at.timestamp()), channel_id)
+                        entry.created_at.timestamp()), channel_id, guild)
 
     async def register_moderator(self, interaction: discord.Interaction, user: discord.Member) -> None:
         """Command to register a user as a moderator with the bot.
@@ -101,7 +156,7 @@ class ModManager(commands.Cog):
         # TODO; Make this an embed
         if not self.is_moderator(user):
             guild = self.db.get_guild(interaction.guild_id)
-            self.db.register_moderator(user.id, guild.default_quotas)
+            self.db.register_moderator(user.id, guild.default_quotas, guild)
             await interaction.response.send_message(f"Adding user {user.display_name} to the moderator list", ephemeral=True)
         else:
             await interaction.response.send_message(f"User {user.display_name} is already in the moderator list", ephemeral=True)
@@ -115,7 +170,7 @@ class ModManager(commands.Cog):
         """
         # TODO; Make this an embed
         if self.is_moderator(user):
-            self.db.de_register_moderator(user.id)
+            self.db.de_register_moderator(user.id, interaction.guild_id)
             await interaction.response.send_message(f"Removing user {user.display_name} from the moderator list", ephemeral=True)
         else:
             await interaction.response.send_message(f"User {user.display_name} is not in the moderator list", ephemeral=True)
@@ -130,7 +185,7 @@ class ModManager(commands.Cog):
         # TODO; Make this an embed
         if self.is_moderator(user):
             sent, edited, deleted = self.db.get_amount_of_actions_by_type(
-                0, int(time.time()), user.id)
+                0, int(time.time()), user.id, interaction.guild_id)
             await interaction.response.send_message(f"moderator {user.display_name} has sent {sent} messages, edited {edited} messages and deleted {deleted} messages.", ephemeral=True)
         else:
             await interaction.response.send_message(f"{user.display_name} is not a moderator", ephemeral=True)
@@ -150,7 +205,7 @@ class ModManager(commands.Cog):
 
     async def get_quotas(self, interaction: discord.Interaction, user: discord.Member) -> None:
         # TODO; Make this an embed
-        mod = self.db.get_moderator(user.id)
+        mod = self.db.get_moderator(user.id, interaction.guild_id)
         if not mod:
             await interaction.response.send_message(f"User {user.display_name} is not a moderator.")
             return
@@ -163,9 +218,15 @@ class ModManager(commands.Cog):
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
-        moderators = self.db.get_all_moderators()
+        moderators = self.db.get_all_moderators_in_guild(interaction.guild_id)
         if not moderators:
-            await interaction.response.send_message(embed = discord.Embed(title="Moderator list", description="There are no moderators in this server", color=discord.Color.from_str("#ffffff")))
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="Moderator list",
+                    description="There are no moderators in this server",
+                    color=discord.Color.from_str("#ffffff")
+                )
+            )
             return
         # Create embed object.
         embed = discord.Embed(
@@ -175,7 +236,7 @@ class ModManager(commands.Cog):
         # Add new field to the embed for every moderator.
         for id in [mod.id for mod in moderators]:
             sent, edited, deleted = self.db.get_amount_of_actions_by_type(
-                0, int(time.time()), id)
+                0, int(time.time()), id, interaction.guild_id)
             embed.add_field(
                 name=interaction.guild.get_member(id).display_name,
                 value=f"sent: {sent}, edited: {edited}, deleted: {deleted}",
@@ -263,7 +324,7 @@ class ModManager(commands.Cog):
 
         # We now have checked and both the timestamps are valid.
         sent, edited, deleted = self.db.get_amount_of_actions_by_type(
-            start_time, end_time, user.id)
+            start_time, end_time, user.id, interaction.guild_id)
 
         embed = discord.Embed(
             title=f"Moderator stats for {user.display_name}",
@@ -285,7 +346,7 @@ class ModManager(commands.Cog):
             bool: If the channel was in the moderator category or not
         """
         return channel.category.id == self.db.get_guild(
-            channel.guild.id,).mod_category_id
+            channel.guild.id).mod_category_id
 
     def is_moderator(self, user: discord.Member) -> bool:
         """Function that checks if the given user is a moderator.
@@ -296,7 +357,7 @@ class ModManager(commands.Cog):
         Returns:
             bool: If the user is a moderator or not.
         """
-        if self.db.get_moderator(user.id):
+        if self.db.get_moderator(user.id, user.guild.id):
             return True
         return False
 
@@ -310,7 +371,7 @@ class SetUserQuotaModal(discord.ui.Modal):
         self.db = cog.db
 
         # Setting the default values to be the moderator's current quota.
-        moderator = cog.db.get_moderator(user.id)
+        moderator = cog.db.get_moderator(user.id, user.guild.id)
 
         self.sent_messages.default = str(moderator.send_quota)
         self.edited_messages.default = str(moderator.edit_quota)
@@ -343,7 +404,7 @@ class SetUserQuotaModal(discord.ui.Modal):
                 self.edited_messages.value,
                 self.deleted_messages.value,
             )
-            self.db.set_quota(self.user.id, quotas)
+            self.db.set_quota(self.user.id, quotas, interaction.guild_id)
             await interaction.response.send_message(f"Updated quotas for {self.user.display_name} to be: sent: {quotas[0]}, edited: {quotas[1]}, deleted: {quotas[2]}", ephemeral=True)
         except ValueError:
             await interaction.response.send_message(f"one of the following is not a number: {self.sent_messages.value}, {self.edited_messages.value}, {self.deleted_messages.value}", ephemeral=True)

@@ -3,10 +3,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import time
+from datetime import datetime
 
 # ? global colour for the cog. Change this when we get around to a cohesive theme and whatnot.
 global colour
 colour = 0x1dff1a
+
 
 class ConfigView(discord.ui.View):
     """View for the config message."""
@@ -14,7 +16,9 @@ class ConfigView(discord.ui.View):
     def __init__(self, db: DBHandler) -> None:
         super().__init__()
         self.mod_category_id = 0
+        self.output_channel_id = 0
         self.mod_category_name = "Null"
+        self.output_channel_name = "Null"
         self.roles = []
         self.wait_time = None
         self.db = db
@@ -22,13 +26,25 @@ class ConfigView(discord.ui.View):
     @discord.ui.select(cls=discord.ui.ChannelSelect,
                        channel_types=[discord.ChannelType.category],
                        placeholder="Select moderator category")
-    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
+    async def channel_category_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
         # Lets the user select a channel category from a dropdown.
         # This function is run every time they change the dropdown.
         # The channel select chooses what category we don't track messages in
         # when we initialize the bot for a new server/guild.
         self.mod_category_id = select.values[0].id
         self.mod_category_name = select.values[0].name
+        await interaction.response.defer()
+
+    @discord.ui.select(cls=discord.ui.ChannelSelect,
+                       channel_types=[discord.ChannelType.text],
+                       placeholder="Select log output chat")
+    async def log_output_chat(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
+        # Lets the user select a channel from a dropdown.
+        # This function is run every time they change the dropdown.
+        # The log output select chooses what channel we send our outputs in
+        # when we initialize the bot for a new server/guild.
+        self.output_channel_id = select.values[0].id
+        self.output_channel_name = select.values[0].name
         await interaction.response.defer()
 
     @discord.ui.select(cls=discord.ui.RoleSelect,
@@ -69,7 +85,10 @@ class ConfigView(discord.ui.View):
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         # Make sure all our fields have proper values and error if not
         if (self.mod_category_id == 0):
-            await interaction.response.send_message("You have to select a category!", ephemeral=True)
+            await interaction.response.send_message("You have to select a moderator category!", ephemeral=True)
+            return
+        if (self.output_channel_id == 0):
+            await interaction.response.send_message("You have to select an output channel!", ephemeral=True)
             return
         if not self.wait_time:
             await interaction.response.send_message("You have to select a default wait time!", ephemeral=True)
@@ -79,16 +98,17 @@ class ConfigView(discord.ui.View):
         # seconds in a day.
         wait_time = int(self.wait_time) * 86_400
 
-        # Setting up the member count voice channel.
-        count = interaction.guild.member_count
-        member_count_channel = await interaction.guild.create_voice_channel(f"members-{count}", reason="Setting up bot, creating channel for tracking member count", position=0, overwrites={interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=False)})
-
         guild = self.db.get_guild(interaction.guild_id)
         if not guild:
+            # Setting up the member count voice channel.
+            count = interaction.guild.member_count
+            member_count_channel = await interaction.guild.create_voice_channel(f"members - {count}", reason="Setting up bot, creating channel for tracking member count", position=0, overwrites={interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=False)})
+
             # Set some initial config stuff from the values we just recieved.
-            self.db.add_guild(interaction.guild_id, (0, 0, 0),
-                              self.mod_category_id, time.time(),
-                              wait_time, member_count_channel.id)
+            self.db.add_guild(
+                interaction.guild_id, (0, 0, 0), self.mod_category_id, int(
+                    datetime.timestamp(
+                        datetime.now())), wait_time, member_count_channel.id, self.output_channel_id)
             guild = self.db.get_guild(interaction.guild_id)
 
         # Register all users who have the selected roles as moderators in the
@@ -97,22 +117,28 @@ class ConfigView(discord.ui.View):
             for member in role.members:
                 if member.id not in [
                         mod.id for mod in self.db.get_all_moderators()]:
-                    self.db.register_moderator(member.id, guild.default_quotas)
+                    self.db.register_moderator(
+                        member.id, guild.default_quotas, guild)
 
         # Disable all the now used dropdowns (as well as the button).
         self.confirm.disabled = True
-        self.channel_select.disabled = True
+        self.channel_category_select.disabled = True
+        self.log_output_chat.disabled = True
         self.role_select.disabled = True
         self.wait_time_select.disabled = True
 
         # Create embed to update the message with.
         embed = discord.Embed(
             title="Config",
-            description="Config set! Please make sure to set your quotas using the ``/configure default_quotas`` command!",
+            description="Config set! Please make sure to update your quotas using the ``/configure default_quotas command``!:",
             colour=colour)
         embed.add_field(
             name="Moderator category:",
             value=self.mod_category_name,
+            inline=False)
+        embed.add_field(
+            name="Output chat:",
+            value=self.output_channel_name,
             inline=False)
 
         if self.roles:
