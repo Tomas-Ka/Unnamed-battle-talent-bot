@@ -1,11 +1,10 @@
-# -*- conding: UTF-8 -*-
 from discord.ext import commands, tasks
 from discord import app_commands
 import discord
 from db_handler import DBHandler
 
 
-class MemberCountManager(commands.Cog):
+class MemberCountManager(commands.GroupCog, name="member_count"):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.db: DBHandler = bot.db
@@ -35,28 +34,7 @@ class MemberCountManager(commands.Cog):
     async def before_check_member_count(self):
         await self.bot.wait_until_ready()
 
-    @app_commands.command()
-    async def delete_member_count_channel(self, interaction: discord.Interaction):
-        """Removes the member count channel from both the server and the database.
-
-        Args:
-            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
-        """
-        guild = self.db.get_guild(interaction.guild_id)
-        if guild:
-            channel = self.bot.get_guild(
-                guild.id).get_channel(
-                guild.member_count_channel_id)
-            self.db.set_member_count_channel_id(guild.id, None)
-            if channel:
-                await channel.delete()
-                await interaction.response.send_message("Successfuly deleted the member count channel.", ephemeral=True)
-                return
-            await interaction.response.send_message("Could not find channel, but deleted database entry.", ephemeral=True)
-            return
-        await interaction.response.send_message("Server is not set up with this bot yet.\nPlease run /configure to do so.", ephemeral=True)
-
-    @app_commands.command()
+    @app_commands.command(name="create")
     async def create_member_count_channel(self, interaction: discord.Interaction):
         """Sets up a new member count channel in the given server (if one does not already exist).
 
@@ -83,7 +61,31 @@ class MemberCountManager(commands.Cog):
             member_count_channel.id)
         await interaction.response.send_message("Member count channel created!", ephemeral=True)
 
+    @app_commands.command(name="delete")
+    async def delete_member_count_channel(self, interaction: discord.Interaction):
+        """Removes the member count channel from both the server and the database.
 
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+        """
+        guild = self.db.get_guild(interaction.guild_id)
+        if guild:
+            channel = self.bot.get_guild(
+                guild.id).get_channel(
+                guild.member_count_channel_id)
+            self.db.set_member_count_channel_id(guild.id, None)
+            if channel:
+                await channel.delete()
+                await interaction.response.send_message("Successfuly deleted the member count channel.", ephemeral=True)
+                return
+            await interaction.response.send_message("Could not find channel, but deleted database entry.", ephemeral=True)
+            return
+        await interaction.response.send_message("Server is not set up with this bot yet.\nPlease run /configure to do so.", ephemeral=True)
+
+
+# ------------------------------MAIN CODE------------------------------
+# This setup is required for the cog to setup and run,
+# and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
-    print(f"\tcogs.Member_count_manager begin loading")
+    print(f"\tcogs.member_count_manager begin loading")
     await bot.add_cog(MemberCountManager(bot))

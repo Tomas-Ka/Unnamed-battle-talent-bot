@@ -1,172 +1,14 @@
-# -*- coding: UTF-8 -*-
-from discord.ext import commands, tasks
-from discord import app_commands
-import discord
 from db_handler import DBHandler
-from datetime import datetime, timezone, timedelta
+import discord
+from discord import app_commands
+from discord.ext import commands, tasks
 import time
-
+from datetime import datetime, timezone, timedelta
 # ? global colour for the cog. Change this when we get around to a cohesive theme and whatnot.
 global colour
-colour = 0x1dff1a
+colour = 0xffffff
 
-
-class ConfigView(discord.ui.View):
-    """View for the config message."""
-
-    def __init__(self, db: DBHandler) -> None:
-        super().__init__()
-        self.mod_category_id = 0
-        self.output_channel_id = 0
-        self.mod_category_name = "Null"
-        self.output_channel_name = "Null"
-        self.roles = []
-        self.wait_time = None
-        self.db = db
-
-    @discord.ui.select(cls=discord.ui.ChannelSelect,
-                       channel_types=[discord.ChannelType.category],
-                       placeholder="Select moderator category")
-    async def channel_category_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
-        # Lets the user select a channel category from a dropdown.
-        # This function is run every time they change the dropdown.
-        # The channel select chooses what category we don't track messages in
-        # when we initialize the bot for a new server/guild.
-        self.mod_category_id = select.values[0].id
-        self.mod_category_name = select.values[0].name
-        await interaction.response.defer()
-
-    @discord.ui.select(cls=discord.ui.ChannelSelect,
-                       channel_types=[discord.ChannelType.text],
-                       placeholder="Select log output chat")
-    async def log_output_chat(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect) -> None:
-        # Lets the user select a channel from a dropdown.
-        # This function is run every time they change the dropdown.
-        # The log output select chooses what channel we send our outputs in
-        # when we initialize the bot for a new server/guild.
-        self.output_channel_id = select.values[0].id
-        self.output_channel_name = select.values[0].name
-        await interaction.response.defer()
-
-    @discord.ui.select(cls=discord.ui.RoleSelect,
-                       placeholder="Select moderator roles to track stats for",
-                       min_values=0,
-                       max_values=25)
-    async def role_select(self, interaction: discord.Interaction, select: discord.ui.RoleSelect) -> None:
-        # Lets the user select one or multiple roles from a dropdown.
-        # This function is run every time they change the dropdown.
-        # The role select chooses who we add automatically as moderators
-        # when we initialize the bot for a new server/guild
-        self.roles = select.values
-        await interaction.response.defer()
-
-    @discord.ui.select(
-        cls=discord.ui.Select,
-        options=[
-            discord.SelectOption(
-                label="1 week",
-                description="check moderator stats once every week",
-                value="7"),
-            discord.SelectOption(
-                label="2 weeks",
-                description="check moderator stats once every other week",
-                value="14"),
-            discord.SelectOption(
-                label="4 weeks",
-                description="check moderator stats once every 4 weeks",
-                value="28")],
-        placeholder="Select how much time we should wait between moderator checks")
-    async def wait_time_select(self, interaction: discord.Interaction, select: discord.ui.Select) -> None:
-        # Lets the user select one of the predetermined valeus from the dropdown.
-        # This setting can also be changed later with a slash command
-        self.wait_time = select.values[0]
-        await interaction.response.defer()
-
-    @discord.ui.button(style=discord.ButtonStyle.success, label="Confirm")
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        # Make sure all our fields have proper values and error if not
-        if (self.mod_category_id == 0):
-            await interaction.response.send_message("You have to select a moderator category!", ephemeral=True)
-            return
-        if (self.output_channel_id == 0):
-            await interaction.response.send_message("You have to select an output channel!", ephemeral=True)
-            return
-        if not self.wait_time:
-            await interaction.response.send_message("You have to select a default wait time!", ephemeral=True)
-            return
-
-        # Get amount of seconds to wait by taking about of days * amount of
-        # seconds in a day.
-        wait_time = int(self.wait_time) * 86_400
-
-        guild = self.db.get_guild(interaction.guild_id)
-        if not guild:
-            # Setting up the member count voice channel.
-            count = interaction.guild.member_count
-            member_count_channel = await interaction.guild.create_voice_channel(f"members - {count}", reason="Setting up bot, creating channel for tracking member count", position=0, overwrites={interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=False)})
-
-            # Set some initial config stuff from the values we just recieved.
-            self.db.add_guild(
-                interaction.guild_id, (0, 0, 0), self.mod_category_id, int(
-                    datetime.timestamp(
-                        datetime.now())), wait_time, member_count_channel.id, self.output_channel_id)
-            guild = self.db.get_guild(interaction.guild_id)
-
-        # Register all users who have the selected roles as moderators in the
-        # database.
-        for role in self.roles:
-            for member in role.members:
-                if member.id not in [
-                        mod.id for mod in self.db.get_all_moderators()]:
-                    self.db.register_moderator(
-                        member.id, guild.default_quotas, guild)
-
-        # Disable all the now used dropdowns (as well as the button).
-        self.confirm.disabled = True
-        self.channel_category_select.disabled = True
-        self.log_output_chat.disabled = True
-        self.role_select.disabled = True
-        self.wait_time_select.disabled = True
-
-        # Create embed to update the message with.
-        embed = discord.Embed(
-            title="Config",
-            description="Config set! Please make sure to update your quotas using the ``/config_set_quotas command``!:",
-            colour=colour)
-        embed.add_field(
-            name="Moderator category:",
-            value=self.mod_category_name,
-            inline=False)
-        embed.add_field(
-            name="Output chat:",
-            value=self.output_channel_name,
-            inline=False)
-
-        if self.roles:
-            # Can't put a \n in an fstring without python 3.12, and so we spin
-            # it out into a var here.
-            names = '\n'.join([role.name for role in self.roles])
-            embed.add_field(
-                name="Registered admins:",
-                value=f"You have registered the following roles as admins:\n{names}",
-                inline=False)
-        else:
-            embed.add_field(
-                name="Registered admins:",
-                value="You have not registered any roles as admin.",
-                inline=False)
-
-        embed.add_field(
-            name="Moderator checks:",
-            value=f"Moderator checks will be done every {self.wait_time} days",
-            inline=False)
-
-        # Update the embed in the sent message.
-        await interaction.response.edit_message(view=None, embed=embed)
-        self.stop()
-
-
-class ModManager(commands.Cog):
+class ModManager(commands.GroupCog, name="moderators"):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.db: DBHandler = bot.db
@@ -366,33 +208,7 @@ class ModManager(commands.Cog):
             return
         await interaction.response.send_message(f"User {user.display_name} has the following quotas:\n``{mod.send_quota} sent messages, {mod.edit_quota} edited messages & {mod.delete_quota} deleted messages``", ephemeral=True)
 
-    # TODO! Maybe spin this out into it's own cog
-    @app_commands.command(description="Configures the bot")
-    async def configure(self, interaction: discord.Interaction) -> None:
-        """Slash command that configures a bot, adds it to the database and makes sure
-        it has all the default settings it requires
-
-        Args:
-            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
-        """
-        embed = discord.Embed(
-            title="Config",
-            description="Please fill in the dropdowns at the bottom of this message (and hit the button) to get this bot set up and running on your server. Once you have finished this, please make sure to set a quota for your moderators by running ``/set_quota``!",
-            colour=colour)
-        await interaction.response.send_message(view=ConfigView(self.db), embed=embed)
-
-    @app_commands.command(description="Set default server quotas")
-    async def config_set_quotas(self, interaction: discord.Interaction, send_quota: int, edit_quota: int, delete_quota: int) -> None:
-        self.db.set_default_quotas(
-            interaction.guild_id, (send_quota, edit_quota, delete_quota,))
-        embed = discord.Embed(
-            title="Set quotas",
-            description=f"The default quota that the moderators need to fufill every week is:\n``{send_quota} sent messages, {edit_quota} edited messages & {delete_quota} deleted messages``\n### Please note that this command has **not** updated any quotas for current moderators",
-            colour=colour)
-
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(description="Sends the current moderator list as an embed")
+    @app_commands.command(description="Sends the current moderator list as an embed", name="list")
     async def list_moderators(self, interaction: discord.Interaction) -> None:
         """Slash command to send a list of all moderators and their stats as an embed.
 
@@ -413,7 +229,7 @@ class ModManager(commands.Cog):
         embed = discord.Embed(
             title="Moderator list",
             description="Here are all the moderators and how many messages they've sent:",
-            colour=discord.Colour.from_str("#ffffff"))
+            colour=colour)
         # Add new field to the embed for every moderator.
         for id in [mod.id for mod in moderators]:
             sent, edited, deleted = self.db.get_amount_of_actions_by_type(
@@ -425,8 +241,16 @@ class ModManager(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(description="Gets the moderator stats for a user in a timeframe")
+    @app_commands.command(description="Gets the moderator stats for a user in a timeframe", name="get_stats")
     async def get_moderator_stats(self, interaction: discord.Interaction, user: discord.Member, earlier_time: str, later_time: str = None) -> None:
+        """Slash command to get the moderator stats for a given user in a certain timeframe.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+            user (discord.Member): The user we want to get stats for.
+            earlier_time (str): Start of timeframe. Either a date (DD/MM/YYY) or an amount of days ago (xd).
+            later_time (str, optional): End of timeframe. Same format as earlier_time. If omitted it will be set to now.
+        """        
 
         if not self.is_moderator(user):
             await interaction.response.send_message(f"User {user.display_name} is not a moderator.")
@@ -510,7 +334,7 @@ class ModManager(commands.Cog):
         embed = discord.Embed(
             title=f"Moderator stats for {user.display_name}",
             description=f"Timeframe is {earlier_date} - {later_date}",
-            colour=discord.Colour.from_str("#ffffff"))
+            colour=colour)
         embed.add_field(name=f"sent: {sent}", value="", inline=False)
         embed.add_field(name=f"edited: {edited}", value="", inline=False)
         embed.add_field(name=f"deleted: {deleted}", value="", inline=False)
@@ -601,5 +425,5 @@ class SetUserQuotaModal(discord.ui.Modal):
 # This setup is required for the cog to setup and run,
 # and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
-    print(f"\tcogs.Mod_manager begin loading")
+    print(f"\tcogs.mod_manager begin loading")
     await bot.add_cog(ModManager(bot))

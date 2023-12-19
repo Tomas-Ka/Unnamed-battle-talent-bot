@@ -33,6 +33,39 @@ class Action:
         self.guild_id = guild_id
 
 
+class Guild:
+    def __init__(
+            self,
+            guild_id: int,
+            mod_category_id: int,
+            last_mod_check: int,
+            time_between_checks: int,
+            default_quotas: str | tuple[int, int, int],
+            member_count_channel_id: int,
+            output_channel_id: int) -> None:
+        """Represents a guild config entry.
+
+        Args:
+            guild_id (int): The guild id for the guild.
+            mod_category_id (int): The id of the mod category.
+            last_mod_check (int): Unix timestamp for last time the moderator stats were checked.
+            time_between_checks (int): The amount of seconds that we should wait before next mod check.
+            default_quota (str | tuple): The default quota for any new moderators.
+            member_cont_channel_id (int): The id of the channel to use for member counts.
+            output_channel_id (int): The id of the channel to post logs and the like in.
+        """
+
+        if isinstance(default_quotas, str):
+            default_quotas = tuple(default_quotas.split(","))
+
+        self.id = guild_id
+        self.mod_category_id = mod_category_id
+        self.last_mod_check = last_mod_check
+        self.time_between_checks = time_between_checks
+        self.default_quotas: tuple[int, int, int] = default_quotas
+        self.member_count_channel_id = member_count_channel_id
+        self.output_channel_id = output_channel_id
+
 class Moderator:
     def __init__(
             self,
@@ -135,37 +168,3 @@ class VacationWeek:
             date (date): Datetime object for the week we wish to update to.
         """
         self.date = date.strftime('%Y-%W')
-
-
-class Guild:
-    def __init__(
-            self,
-            guild_id: int,
-            mod_category_id: int,
-            last_mod_check: int,
-            time_between_checks: int,
-            default_quotas: str | tuple[int, int, int],
-            member_count_channel_id: int,
-            output_channel_id: int) -> None:
-        """Represents a guild config entry.
-
-        Args:
-            guild_id (int): The guild id for the guild.
-            mod_category_id (int): The id of the mod category.
-            last_mod_check (int): Unix timestamp for last time the moderator stats were checked.
-            time_between_checks (int): The amount of seconds that we should wait before next mod check.
-            default_quota (str | tuple): The default quota for any new moderators.
-            member_cont_channel_id (int): The id of the channel to use for member counts.
-            output_channel_id (int): The id of the channel to post logs and the like in.
-        """
-
-        if isinstance(default_quotas, str):
-            default_quotas = tuple(default_quotas.split(","))
-
-        self.id = guild_id
-        self.mod_category_id = mod_category_id
-        self.last_mod_check = last_mod_check
-        self.time_between_checks = time_between_checks
-        self.default_quotas: tuple[int, int, int] = default_quotas
-        self.member_count_channel_id = member_count_channel_id
-        self.output_channel_id = output_channel_id

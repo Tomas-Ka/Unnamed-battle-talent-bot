@@ -1,4 +1,3 @@
-# -*- coding: UTF-8 -*-
 from discord.ext import commands
 from discord import app_commands
 import discord
@@ -9,7 +8,7 @@ global colour
 colour = 0x2db83d
 
 
-class StickyManager(commands.Cog):
+class StickyManager(commands.GroupCog, name="sticky"):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.db: DBHandler = bot.db
@@ -37,7 +36,7 @@ class StickyManager(commands.Cog):
             self.db.update_sticky(sticky.channel_id, new_sticky.id)
 
     @app_commands.command()
-    async def create_sticky(self, interaction: discord.Interaction) -> None:
+    async def create(self, interaction: discord.Interaction) -> None:
         """Creates a sticky in this channel.
 
         Args:
@@ -49,7 +48,7 @@ class StickyManager(commands.Cog):
         await interaction.response.send_modal(CreateStickyModal(self, interaction, self.bot.user.display_name))
 
     @app_commands.command()
-    async def delete_sticky(self, interaction: discord.Interaction, del_message: bool = False) -> None:
+    async def delete(self, interaction: discord.Interaction, del_message: bool = False) -> None:
         """Deletes a sticky in the current channel.
 
         Args:
@@ -118,6 +117,9 @@ class CreateStickyModal(discord.ui.Modal):
         await super().on_error(interaction, error)
 
 
+# ------------------------------MAIN CODE------------------------------
+# This setup is required for the cog to setup and run,
+# and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.sticky_manager begin loading")
     await bot.add_cog(StickyManager(bot))
