@@ -4,14 +4,11 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import time
 from datetime import datetime, timezone, timedelta
-
 # ? global colour for the cog. Change this when we get around to a cohesive theme and whatnot.
-#global colour
-#colour = 0x1dff1a
+global colour
+colour = 0xffffff
 
-
-
-class ModManager(commands.Cog):
+class ModManager(commands.GroupCog, name="moderators"):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.db: DBHandler = bot.db
@@ -211,7 +208,7 @@ class ModManager(commands.Cog):
             return
         await interaction.response.send_message(f"User {user.display_name} has the following quotas:\n``{mod.send_quota} sent messages, {mod.edit_quota} edited messages & {mod.delete_quota} deleted messages``", ephemeral=True)
 
-    @app_commands.command(description="Sends the current moderator list as an embed")
+    @app_commands.command(description="Sends the current moderator list as an embed", name="list")
     async def list_moderators(self, interaction: discord.Interaction) -> None:
         """Slash command to send a list of all moderators and their stats as an embed.
 
@@ -232,7 +229,7 @@ class ModManager(commands.Cog):
         embed = discord.Embed(
             title="Moderator list",
             description="Here are all the moderators and how many messages they've sent:",
-            colour=discord.Colour.from_str("#ffffff"))
+            colour=colour)
         # Add new field to the embed for every moderator.
         for id in [mod.id for mod in moderators]:
             sent, edited, deleted = self.db.get_amount_of_actions_by_type(
@@ -244,8 +241,16 @@ class ModManager(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(description="Gets the moderator stats for a user in a timeframe")
+    @app_commands.command(description="Gets the moderator stats for a user in a timeframe", name="get_stats")
     async def get_moderator_stats(self, interaction: discord.Interaction, user: discord.Member, earlier_time: str, later_time: str = None) -> None:
+        """Slash command to get the moderator stats for a given user in a certain timeframe.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+            user (discord.Member): The user we want to get stats for.
+            earlier_time (str): Start of timeframe. Either a date (DD/MM/YYY) or an amount of days ago (xd).
+            later_time (str, optional): End of timeframe. Same format as earlier_time. If omitted it will be set to now.
+        """        
 
         if not self.is_moderator(user):
             await interaction.response.send_message(f"User {user.display_name} is not a moderator.")
@@ -329,7 +334,7 @@ class ModManager(commands.Cog):
         embed = discord.Embed(
             title=f"Moderator stats for {user.display_name}",
             description=f"Timeframe is {earlier_date} - {later_date}",
-            colour=discord.Colour.from_str("#ffffff"))
+            colour=colour)
         embed.add_field(name=f"sent: {sent}", value="", inline=False)
         embed.add_field(name=f"edited: {edited}", value="", inline=False)
         embed.add_field(name=f"deleted: {deleted}", value="", inline=False)
