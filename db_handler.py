@@ -709,7 +709,7 @@ class DBHandler():
         """
         self._execute_query(guild_add_query,
                             (guild_id,
-                                "".join(map(str, default_quotas)),
+                                ",".join(map(str, default_quotas)),
                                 mod_category_id,
                                 last_mod_check,
                                 time_between_checks,
